@@ -21,8 +21,7 @@
   min-height: 72px;
 }
 
-/* Keep setup and question as separate blocks, but render both with the same
-   normal-weight Computer Modern / KaTeX typography. */
+/* Setup and prompt stay separate, but use the same normal-weight exam typography. */
 .prompt {
   font-weight: 400 !important;
 }
@@ -101,6 +100,204 @@
   font-size: 11px;
 }
 
+.topic-filter {
+  margin-top: 14px;
+}
+
+.topic-filter .field-title {
+  margin-bottom: 7px;
+}
+
+.topic-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.topic-chips button {
+  background: white;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 11px;
+  min-height: 30px;
+  padding: 5px 9px;
+}
+
+.topic-chips button:hover,
+.topic-chips button.active {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.topic-chips button.active {
+  background: var(--ink);
+  color: white;
+}
+
+.compact-hero {
+  align-items: baseline;
+  display: flex;
+  gap: 16px;
+}
+
+.compact-hero h1 {
+  font-size: clamp(30px, 3vw, 42px);
+  letter-spacing: -.04em;
+  line-height: 1;
+  margin: 0;
+}
+
+.compact-hero > span {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.bank-summary {
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 11px;
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.compact-empty {
+  min-height: 56px;
+  padding: 16px 0;
+}
+
+@media (min-width: 851px) {
+  .topbar {
+    min-height: 64px;
+    padding-left: clamp(24px, 4vw, 56px);
+    padding-right: clamp(24px, 4vw, 56px);
+  }
+
+  .brand-mark {
+    height: 32px;
+    width: 42px;
+  }
+
+  .brand strong {
+    font-size: 14px;
+  }
+
+  .compact-setup-layout {
+    align-items: start;
+    gap: clamp(28px, 4vw, 52px);
+    grid-template-columns: minmax(0, 1.8fr) minmax(250px, .62fr);
+    max-width: 1280px;
+    padding: 22px clamp(28px, 4vw, 56px) 24px;
+  }
+
+  .compact-setup-card {
+    margin-top: 16px;
+    padding: 18px 20px;
+  }
+
+  .compact-filters {
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .exam-filter-row {
+    grid-template-columns: minmax(240px, .7fr);
+  }
+
+  .compact-filters label > span,
+  .compact-setup-card .field-title {
+    margin-bottom: 5px;
+  }
+
+  .compact-filters select,
+  .compact-filters .search-input {
+    min-height: 40px;
+  }
+
+  .compact-length-row {
+    margin-top: 14px;
+    padding: 12px 0;
+  }
+
+  .compact-length-row small {
+    font-size: 10px;
+  }
+
+  .compact-start-row {
+    padding-top: 14px;
+  }
+
+  .compact-start-row .primary-button {
+    min-height: 44px;
+  }
+
+  .compact-stats-panel {
+    padding-left: clamp(22px, 3vw, 38px);
+  }
+
+  .compact-stat-grid {
+    margin-top: 14px;
+  }
+
+  .compact-stat-grid > div {
+    min-height: 72px;
+    padding-bottom: 10px;
+    padding-top: 12px;
+  }
+
+  .compact-stat-grid strong {
+    font-size: 24px;
+  }
+
+  .compact-stat-grid span {
+    margin-top: 4px;
+  }
+
+  .compact-local-actions {
+    gap: 4px;
+    margin-top: 10px;
+  }
+
+  .compact-review-bin {
+    max-height: 156px;
+    overflow-y: auto;
+  }
+
+  .compact-review-bin .review-heading {
+    background: white;
+    padding: 10px 0 6px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .compact-review-bin .review-row {
+    padding: 8px 0;
+  }
+
+  .compact-review-bin .review-row p {
+    margin-top: 2px;
+  }
+
+  .compact-exam-settings {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .compact-exam-settings .exam-settings-heading {
+    margin-bottom: 7px;
+  }
+
+  .compact-exam-settings .exam-settings-grid {
+    gap: 7px;
+  }
+
+  .compact-exam-settings .exam-setting {
+    align-items: center;
+    min-height: 44px;
+    padding: 9px 10px;
+  }
+}
+
 @media (max-width: 850px) {
   .exam-settings-grid {
     grid-template-columns: 1fr;
@@ -109,5 +306,19 @@
   .answer-grid,
   .answer-grid.options-3 {
     grid-template-columns: 1fr !important;
+  }
+
+  .compact-setup-layout {
+    padding-top: 30px;
+  }
+
+  .compact-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .compact-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
   }
 }
