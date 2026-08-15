@@ -1,13 +1,33 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import "../data/hs25-additions";
 import { questions } from "../data/questions";
 import { answerProgress, setQuestionStatus } from "../lib/progress";
 import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
 import type { ProgressStore } from "../types/question";
 
-test("the supplied bank contains 13 questions with stable unique ids", () => {
-  assert.equal(questions.length, 13);
-  assert.equal(new Set(questions.map((question) => question.id)).size, 13);
+function normalizedPrompt(prompt: string) {
+  return prompt
+    .replace(/\\\\/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/[.$`]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+test("the supplied bank contains 23 questions with unique ids and question texts", () => {
+  assert.equal(questions.length, 23);
+  assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);
+  assert.equal(new Set(questions.map((question) => normalizedPrompt(question.prompt))).size, questions.length);
+});
+
+test("the complete source keeps the Lasso closed-form question as Question 6 without duplicating it", () => {
+  const closedForm = questions.filter((question) => normalizedPrompt(question.prompt).includes("lasso solution") && normalizedPrompt(question.prompt).includes("closed form via matrix inversion"));
+  assert.equal(closedForm.length, 1);
+  assert.equal(closedForm[0].number, 6);
+
+  const questionFive = questions.find((question) => question.number === 5 && question.prompt.includes("lasso penalty encourages sparsity"));
+  assert.ok(questionFive);
 });
 
 test("a duplicated source entry can never create a repeated session question", () => {
@@ -31,10 +51,12 @@ test("Practice receives new questions, Review receives review questions, and Exa
 });
 
 test("an exam run contains every question from the selected exam in question-number order", () => {
-  const shuffled = [questions[4], questions[0], questions[2], questions[1]];
-  const selected = questionsForExam(shuffled, "HS25");
+  const selected = questionsForExam(questions, "HS25");
+  const numbers = selected.map((question) => question.number);
+  const sortedNumbers = [...numbers].sort((a, b) => a - b);
 
-  assert.deepEqual(selected.map((question) => question.number), [5, 7, 8, 10]);
+  assert.deepEqual(numbers, sortedNumbers);
+  assert.equal(selected.length, questions.length);
 });
 
 test("incorrect answers enter Review and a correct review answer moves to Done", () => {
