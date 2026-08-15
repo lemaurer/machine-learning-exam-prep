@@ -36,6 +36,7 @@ import {
 } from "../types/question";
 import { LatexText } from "./components/LatexText";
 import { QuestionEditor } from "./components/QuestionEditor";
+import "./exam-ui.css";
 
 type Screen = "setup" | "session" | "results";
 type SessionSize = "5" | "10" | "all";
@@ -43,6 +44,18 @@ type SessionAnswer = {
   questionId: string;
   selectedIds: OptionId[];
   correct: boolean;
+};
+type ExamSettings = {
+  feedbackAfterEach: boolean;
+  showFinalReview: boolean;
+  showProgressBar: boolean;
+};
+
+const EXAM_SETTINGS_KEY = "iml-exam-settings-v1";
+const DEFAULT_EXAM_SETTINGS: ExamSettings = {
+  feedbackAfterEach: false,
+  showFinalReview: true,
+  showProgressBar: true,
 };
 
 const MODE_COPY: Record<SessionMode, { eyebrow: string; title: string; body: string }> = {
@@ -57,11 +70,20 @@ const MODE_COPY: Record<SessionMode, { eyebrow: string; title: string; body: str
     body: "Incorrect answers and questions you save for later collect here. A question disappears from Review as soon as you answer it correctly. Skipping leaves it in Review.",
   },
   exam: {
-    eyebrow: "Work without hints",
-    title: "Simulate a complete exam run.",
-    body: "Choose one supplied exam and work through every question in its original order. No feedback is shown during the attempt, and your normal Done/Review progress is not changed.",
+    eyebrow: "Work through a complete paper",
+    title: "Configure your exam run.",
+    body: "Choose one supplied exam and work through every question in its original order. You can keep strict exam conditions or turn on feedback after each question. Done/Review progress is not changed during the attempt.",
   },
 };
+
+function loadExamSettings(): ExamSettings {
+  if (typeof window === "undefined") return DEFAULT_EXAM_SETTINGS;
+  try {
+    return { ...DEFAULT_EXAM_SETTINGS, ...JSON.parse(window.localStorage.getItem(EXAM_SETTINGS_KEY) || "{}") };
+  } catch {
+    return DEFAULT_EXAM_SETTINGS;
+  }
+}
 
 export function ExamPrepApp() {
   const [ready, setReady] = useState(false);
@@ -72,6 +94,7 @@ export function ExamPrepApp() {
   const [difficulty, setDifficulty] = useState<Difficulty | "all">("all");
   const [query, setQuery] = useState("");
   const [sessionSize, setSessionSize] = useState<SessionSize>("5");
+  const [examSettings, setExamSettings] = useState<ExamSettings>(DEFAULT_EXAM_SETTINGS);
   const [progress, setProgress] = useState<ProgressStore>({});
   const [edits, setEdits] = useState<EditStore>({});
   const [sessionIds, setSessionIds] = useState<string[]>([]);
@@ -85,8 +108,14 @@ export function ExamPrepApp() {
     const knownIds = new Set(sourceQuestions.map((question) => question.id));
     setProgress(Object.fromEntries(Object.entries(loadProgress()).filter(([id]) => knownIds.has(id))));
     setEdits(Object.fromEntries(Object.entries(loadEdits()).filter(([id]) => knownIds.has(id))));
+    setExamSettings(loadExamSettings());
     setReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    window.localStorage.setItem(EXAM_SETTINGS_KEY, JSON.stringify(examSettings));
+  }, [examSettings, ready]);
 
   const questions = useMemo(
     () => uniqueQuestionsById(sourceQuestions.map((question) => applyEdits(question, edits[question.id]))),
@@ -194,9 +223,13 @@ export function ExamPrepApp() {
   }
 
   function commitExamAnswer() {
-    if (!currentQuestion || !selectedIds.length) return;
+    if (!currentQuestion || feedbackVisible || !selectedIds.length) return;
     const correct = isCorrectSelection(currentQuestion, selectedIds);
-    setSessionAnswers((answers) => [...answers, { questionId: currentQuestion.id, selectedIds, correct }]);
+    setSessionAnswers((answers) => [...answers, { questionId: currentQuestion.id, selectedIds: [...selectedIds], correct }]);
+    if (examSettings.feedbackAfterEach) {
+      setFeedbackVisible(true);
+      return;
+    }
     advance(true);
   }
 
@@ -285,9 +318,14 @@ export function ExamPrepApp() {
       } else if (!feedbackVisible && key === "S") {
         skipQuestion();
       } else if (event.key === "Enter") {
-        if (mode === "exam") commitExamAnswer();
-        else if (feedbackVisible) advance();
-        else if (currentQuestion.multipleSelect) submitPracticeAnswer();
+        if (mode === "exam") {
+          if (feedbackVisible) advance(true);
+          else commitExamAnswer();
+        } else if (feedbackVisible) {
+          advance(true);
+        } else if (currentQuestion.multipleSelect) {
+          submitPracticeAnswer();
+        }
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -322,14 +360,15 @@ export function ExamPrepApp() {
           difficulty={difficulty}
           query={query}
           sessionSize={sessionSize}
+          examSettings={examSettings}
           setExamId={setExamId}
           setTopic={setTopic}
           setDifficulty={setDifficulty}
           setQuery={setQuery}
           setSessionSize={setSessionSize}
+          setExamSettings={setExamSettings}
           availableQuestions={availableQuestions}
           reviewQuestions={reviewQuestions}
-          progress={progress}
           totals={totals}
           editedCount={Object.keys(edits).length}
           onStart={startSession}
@@ -347,10 +386,11 @@ export function ExamPrepApp() {
           total={sessionIds.length}
           selectedIds={selectedIds}
           feedbackVisible={feedbackVisible}
+          showProgressBar={mode !== "exam" || examSettings.showProgressBar}
           status={progress[currentQuestion.id]?.status ?? "new"}
           onChoose={chooseAnswer}
           onSubmit={mode === "exam" ? commitExamAnswer : submitPracticeAnswer}
-          onNext={() => advance()}
+          onNext={() => advance(true)}
           onSkip={skipQuestion}
           onEdit={() => setEditing(true)}
           onEnd={endSession}
@@ -364,6 +404,7 @@ export function ExamPrepApp() {
           answers={sessionAnswers}
           questions={questions}
           progress={progress}
+          showAnswerReview={mode !== "exam" || examSettings.showFinalReview}
           onQueueReview={queueForReview}
           onDone={markDone}
           onReturn={() => setScreen("setup")}
@@ -393,14 +434,15 @@ function SetupScreen({
   difficulty,
   query,
   sessionSize,
+  examSettings,
   setExamId,
   setTopic,
   setDifficulty,
   setQuery,
   setSessionSize,
+  setExamSettings,
   availableQuestions,
   reviewQuestions,
-  progress,
   totals,
   editedCount,
   onStart,
@@ -414,14 +456,15 @@ function SetupScreen({
   difficulty: Difficulty | "all";
   query: string;
   sessionSize: SessionSize;
+  examSettings: ExamSettings;
   setExamId: (value: string) => void;
   setTopic: (value: Topic | "all") => void;
   setDifficulty: (value: Difficulty | "all") => void;
   setQuery: (value: string) => void;
   setSessionSize: (value: SessionSize) => void;
+  setExamSettings: (value: ExamSettings) => void;
   availableQuestions: Question[];
   reviewQuestions: Question[];
-  progress: ProgressStore;
   totals: { newCount: number; done: number; review: number; attempts: number; accuracy: number };
   editedCount: number;
   onStart: () => void;
@@ -436,6 +479,9 @@ function SetupScreen({
       ? availableQuestions.length
       : Math.min(Number(sessionSize), availableQuestions.length);
   const selectedExam = EXAMS.find((exam) => exam.id === examId);
+  const updateExamSetting = <K extends keyof ExamSettings>(key: K, value: ExamSettings[K]) => {
+    setExamSettings({ ...examSettings, [key]: value });
+  };
 
   return (
     <div className="setup-layout">
@@ -461,10 +507,29 @@ function SetupScreen({
           )}
 
           {mode === "exam" ? (
-            <div className="length-row">
-              <div><span className="field-title">Complete exam</span><small>{availableQuestions.length} question{availableQuestions.length === 1 ? "" : "s"} · original question-number order · progress unchanged</small></div>
-              <span className="local-pill">{selectedExam?.id ?? "Exam"}</span>
-            </div>
+            <>
+              <div className="length-row">
+                <div><span className="field-title">Complete exam</span><small>{availableQuestions.length} question{availableQuestions.length === 1 ? "" : "s"} · original question-number order · study progress unchanged</small></div>
+                <span className="local-pill">{selectedExam?.id ?? "Exam"}</span>
+              </div>
+              <div className="exam-settings">
+                <div className="exam-settings-heading"><strong>Exam settings</strong><small>Remembered for your next attempt</small></div>
+                <div className="exam-settings-grid">
+                  <label className="exam-setting">
+                    <input type="checkbox" checked={examSettings.feedbackAfterEach} onChange={(event) => updateExamSetting("feedbackAfterEach", event.target.checked)} />
+                    <span><strong>Feedback after each question</strong><small>Show correctness and the explanation immediately after locking an answer.</small></span>
+                  </label>
+                  <label className="exam-setting">
+                    <input type="checkbox" checked={examSettings.showFinalReview} onChange={(event) => updateExamSetting("showFinalReview", event.target.checked)} />
+                    <span><strong>Full review at the end</strong><small>Show every selected answer, correct answer, and solution after the score.</small></span>
+                  </label>
+                  <label className="exam-setting">
+                    <input type="checkbox" checked={examSettings.showProgressBar} onChange={(event) => updateExamSetting("showProgressBar", event.target.checked)} />
+                    <span><strong>Show progress bar</strong><small>Keep the horizontal progress indicator visible during the exam.</small></span>
+                  </label>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="length-row">
               <div><span className="field-title">Session length</span><small>{availableQuestions.length} matching question{availableQuestions.length === 1 ? "" : "s"} available</small></div>
@@ -489,7 +554,7 @@ function SetupScreen({
 
           <div className="start-row">
             <button className="primary-button" disabled={!availableQuestions.length} onClick={onStart}>{availableQuestions.length ? `${mode === "exam" ? "Begin exam" : mode === "review" ? "Start review" : "Start practice"} · ${startCount}` : mode === "review" ? "Review bin is clear" : mode === "exam" ? "No questions in this exam" : "No unanswered questions"}<span>→</span></button>
-            <span className="shortcut-hint"><kbd>A</kbd>–<kbd>F</kbd> · <kbd>S</kbd> skip · <kbd>Enter</kbd> submit multi-answer</span>
+            <span className="shortcut-hint"><kbd>A</kbd>–<kbd>F</kbd> · <kbd>S</kbd> skip · <kbd>Enter</kbd> submit/continue</span>
           </div>
         </div>
       </section>
@@ -534,6 +599,7 @@ function SessionScreen({
   total,
   selectedIds,
   feedbackVisible,
+  showProgressBar,
   status,
   onChoose,
   onSubmit,
@@ -549,6 +615,7 @@ function SessionScreen({
   total: number;
   selectedIds: OptionId[];
   feedbackVisible: boolean;
+  showProgressBar: boolean;
   status: "new" | "done" | "review";
   onChoose: (id: QuestionOption["id"]) => void;
   onSubmit: () => void;
@@ -560,8 +627,8 @@ function SessionScreen({
 }) {
   const expectedIds = correctOptionIds(question);
   const isCorrect = feedbackVisible && isCorrectSelection(question, selectedIds);
-  const trueFalse = question.options.length === 2 && question.options[0]?.text === "True" && question.options[1]?.text === "False";
   const selectedLabel = answerLabel(selectedIds);
+  const longOptions = question.options.some((option) => option.text.replace(/\$+/g, "").length > 48);
 
   return (
     <div className="session-page">
@@ -569,7 +636,7 @@ function SessionScreen({
         <div><span className="mode-label">{mode === "exam" ? question.examLabel : `${mode} session`}</span><strong>Question {index + 1}<span> of {total}</span></strong></div>
         <div className="session-actions"><button className="text-button" onClick={onEdit}>Edit question</button><button className="text-button" onClick={onEnd}>End session</button></div>
       </div>
-      <div className="progress-track"><span style={{ width: `${((index + (feedbackVisible ? 1 : 0)) / total) * 100}%` }} /></div>
+      {showProgressBar && <div className="progress-track"><span style={{ width: `${((index + (feedbackVisible ? 1 : 0)) / total) * 100}%` }} /></div>}
 
       <article className="question-card">
         <div className="question-meta"><span>{question.examId}</span><span>{question.topic}</span><span>{question.difficulty}</span><span>{question.source}</span>{question.multipleSelect && <span>Mark all that apply</span>}</div>
@@ -578,17 +645,26 @@ function SessionScreen({
         <FigureBlock question={question} />
         <div className="prompt"><LatexText text={question.prompt} /></div>
 
-        <div className={`answer-grid options-${question.options.length}`}>
+        <div className={`answer-grid options-${question.options.length} ${longOptions ? "long-options" : ""}`}>
           {question.options.map((option) => {
             const selected = selectedIds.includes(option.id);
             const correct = feedbackVisible && expectedIds.includes(option.id);
             const incorrect = feedbackVisible && selected && !correct;
-            const shortcut = trueFalse ? (option.text === "True" ? "T" : "F") : option.id;
-            return <button key={option.id} className={`answer-button ${selected ? "selected" : ""} ${correct ? "correct" : ""} ${incorrect ? "incorrect" : ""}`} disabled={feedbackVisible} onClick={() => onChoose(option.id)}><kbd>{shortcut}</kbd><span className="option-letter">{option.id}</span><span><LatexText text={option.text} /></span></button>;
+            return (
+              <button
+                key={option.id}
+                className={`answer-button ${selected ? "selected" : ""} ${correct ? "correct" : ""} ${incorrect ? "incorrect" : ""}`}
+                disabled={feedbackVisible}
+                onClick={() => onChoose(option.id)}
+              >
+                <kbd>{option.id}</kbd>
+                <span><LatexText text={option.text} /></span>
+              </button>
+            );
           })}
         </div>
 
-        {mode === "exam" && (
+        {mode === "exam" && !feedbackVisible && (
           <div className="exam-commit">
             <span>{selectedIds.length ? `${selectedLabel} selected.${question.multipleSelect ? " Select all that apply, then lock the answer." : ""}` : question.multipleSelect ? "Select all answers that apply, or skip." : "Choose an answer, or skip this question."}</span>
             <div className="session-actions">
@@ -612,9 +688,20 @@ function SessionScreen({
           <div className="next-row"><div><span>Skip leaves this question and its progress exactly as it is.</span></div><button className="secondary-button compact" onClick={onSkip}>Skip question <span>→</span></button></div>
         )}
 
-        {feedbackVisible && <div className={`feedback ${isCorrect ? "correct" : "incorrect"}`} role="status"><div className="feedback-icon">{isCorrect ? "✓" : "×"}</div><div><strong>{isCorrect ? "Correct" : `Incorrect · Correct answer${expectedIds.length > 1 ? "s" : ""}: ${answerLabel(expectedIds)}`}</strong><p><LatexText text={question.explanation} /></p><small>{question.source}</small></div></div>}
+        {feedbackVisible && (
+          <div className={`feedback ${isCorrect ? "correct" : "incorrect"}`} role="status">
+            <div className="feedback-icon">{isCorrect ? "✓" : "×"}</div>
+            <div><strong>{isCorrect ? "Correct" : `Incorrect · Correct answer${expectedIds.length > 1 ? "s" : ""}: ${answerLabel(expectedIds)}`}</strong><p><LatexText text={question.explanation} /></p><small>{question.source}</small></div>
+          </div>
+        )}
 
-        {feedbackVisible && <div className="next-row"><div>{!isCorrect || status === "review" ? <span>Saved in Review</span> : mode === "review" ? <span>Cleared from Review</span> : <button className="secondary-button compact" onClick={onQueueReview}>Save to Review for later</button>}</div><button className="primary-button compact" onClick={onNext}>{index + 1 === total ? "See session review" : "Next question"}<span>→</span></button></div>}
+        {feedbackVisible && mode === "exam" && (
+          <div className="next-row"><div><span className="exam-feedback-note">Exam progress remains unchanged.</span></div><button className="primary-button compact" onClick={onNext}>{index + 1 === total ? "See exam result" : "Next question"}<span>→</span></button></div>
+        )}
+
+        {feedbackVisible && mode !== "exam" && (
+          <div className="next-row"><div>{!isCorrect || status === "review" ? <span>Saved in Review</span> : mode === "review" ? <span>Cleared from Review</span> : <button className="secondary-button compact" onClick={onQueueReview}>Save to Review for later</button>}</div><button className="primary-button compact" onClick={onNext}>{index + 1 === total ? "See session review" : "Next question"}<span>→</span></button></div>
+        )}
       </article>
     </div>
   );
@@ -625,6 +712,7 @@ function ResultsScreen({
   answers,
   questions,
   progress,
+  showAnswerReview,
   onQueueReview,
   onDone,
   onReturn,
@@ -634,6 +722,7 @@ function ResultsScreen({
   answers: SessionAnswer[];
   questions: Question[];
   progress: ProgressStore;
+  showAnswerReview: boolean;
   onQueueReview: (id: string) => void;
   onDone: (id: string) => void;
   onReturn: () => void;
@@ -661,30 +750,32 @@ function ResultsScreen({
         <div className="result-actions"><button className="primary-button" onClick={onReturn}>Back to setup <span>→</span></button>{mode !== "exam" && incorrectAnswered > 0 && <button className="secondary-button" onClick={onOpenReview}>Open Review</button>}</div>
       </section>
 
-      <section className="answer-review">
-        <div className="answer-review-heading"><div><span className="eyebrow">Complete answer review</span><h2>Every question and solution</h2></div><span>{answers.length} questions · {skipped} skipped</span></div>
-        <div className="answer-list">
-          {answers.map((answer, index) => {
-            const question = questions.find((item) => item.id === answer.questionId);
-            if (!question) return null;
-            const expectedIds = correctOptionIds(question);
-            const selectedOptions = question.options.filter((option) => answer.selectedIds.includes(option.id));
-            const correctOptions = question.options.filter((option) => expectedIds.includes(option.id));
-            const isReview = progress[question.id]?.status === "review";
-            const wasSkipped = answer.selectedIds.length === 0;
-            return <details key={question.id} className={`answer-item ${answer.correct ? "correct" : "incorrect"}`} open={mode === "exam" || !answer.correct}>
-              <summary><span className="result-index">{String(index + 1).padStart(2, "0")}</span><span className="result-mark">{wasSkipped ? "—" : answer.correct ? "✓" : "×"}</span><span className="result-question"><small>{question.examId} · Question {question.number} · {question.topic}</small><LatexText text={question.prompt} /></span><span className="result-answer">{answerLabel(answer.selectedIds)} / {answerLabel(expectedIds)}</span></summary>
-              <div className="answer-detail">
-                {question.setup && <div className="answer-setup"><LatexText text={question.setup} /></div>}
-                {wasSkipped ? <p><strong>Your answer:</strong> Skipped.</p> : <p><strong>Your answer:</strong> {selectedOptions.map((option) => `${option.id}. ${option.text}`).join(" · ")}</p>}
-                <p><strong>Correct answer{expectedIds.length > 1 ? "s" : ""}:</strong> {correctOptions.map((option) => `${option.id}. ${option.text}`).join(" · ")}</p>
-                <div className="solution-copy"><LatexText text={question.explanation} /></div>
-                <div className="review-toggle">{isReview ? <><span>In Review</span><button className="text-button" onClick={() => onDone(question.id)}>Move to Done</button></> : <button className="secondary-button compact" onClick={() => onQueueReview(question.id)}>Save to Review</button>}</div>
-              </div>
-            </details>;
-          })}
-        </div>
-      </section>
+      {showAnswerReview && (
+        <section className="answer-review">
+          <div className="answer-review-heading"><div><span className="eyebrow">Complete answer review</span><h2>Every question and solution</h2></div><span>{answers.length} questions · {skipped} skipped</span></div>
+          <div className="answer-list">
+            {answers.map((answer, index) => {
+              const question = questions.find((item) => item.id === answer.questionId);
+              if (!question) return null;
+              const expectedIds = correctOptionIds(question);
+              const selectedOptions = question.options.filter((option) => answer.selectedIds.includes(option.id));
+              const correctOptions = question.options.filter((option) => expectedIds.includes(option.id));
+              const isReview = progress[question.id]?.status === "review";
+              const wasSkipped = answer.selectedIds.length === 0;
+              return <details key={question.id} className={`answer-item ${answer.correct ? "correct" : "incorrect"}`} open={mode === "exam" || !answer.correct}>
+                <summary><span className="result-index">{String(index + 1).padStart(2, "0")}</span><span className="result-mark">{wasSkipped ? "—" : answer.correct ? "✓" : "×"}</span><span className="result-question"><small>{question.examId} · Question {question.number} · {question.topic}</small><LatexText text={question.prompt} /></span><span className="result-answer">{answerLabel(answer.selectedIds)} / {answerLabel(expectedIds)}</span></summary>
+                <div className="answer-detail">
+                  {question.setup && <div className="answer-setup"><LatexText text={question.setup} /></div>}
+                  {wasSkipped ? <p><strong>Your answer:</strong> Skipped.</p> : <p><strong>Your answer:</strong> {selectedOptions.map((option) => `${option.id}. ${option.text}`).join(" · ")}</p>}
+                  <p><strong>Correct answer{expectedIds.length > 1 ? "s" : ""}:</strong> {correctOptions.map((option) => `${option.id}. ${option.text}`).join(" · ")}</p>
+                  <div className="solution-copy"><LatexText text={question.explanation} /></div>
+                  <div className="review-toggle">{isReview ? <><span>In Review</span><button className="text-button" onClick={() => onDone(question.id)}>Move to Done</button></> : <button className="secondary-button compact" onClick={() => onQueueReview(question.id)}>Save to Review</button>}</div>
+                </div>
+              </details>;
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
