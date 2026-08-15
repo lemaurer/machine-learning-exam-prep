@@ -1,208 +1,136 @@
-import type { Question } from "../types/question";
+import type { Difficulty, Question, QuestionOption, Topic } from "../types/question";
 import { questions } from "./questions";
 
-const LAPLACE_GMM_SETUP = "We model arrival times at a gym using a two-component Laplace GMM:\n\n$$p(x \\mid z=k) = \\frac{1}{2b_k} \\exp\\left( -\\frac{|x - \\mu_k|}{b_k} \\right)$$";
+type OptionId = QuestionOption["id"];
 
-const additionalQuestions: Question[] = [
-  {
-    id: "hs25-q01",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 1,
-    title: "Convexity of empirical squared risk",
-    prompt: "$R_D(w)$ is a convex function in $w$.",
-    options: [{ id: "A", text: "True" }, { id: "B", text: "False" }],
-    correctOptionId: "A",
-    explanation: "Since the objective is a quadratic function of the parameters $w$ with a positive semi-definite matrix $X^\\top X$, the empirical squared loss $L(w) = \\frac{1}{2N} \\lVert y - Xw\\rVert_2^2$ is always convex.",
-    topic: "Kernels & Regression",
-    difficulty: "Foundation",
-    source: "HS25 · Question 1 · 1 point",
-  },
-  {
-    id: "hs25-q02",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 2,
-    title: "Uniqueness of empirical risk minimizers",
-    prompt: "The empirical risk minimizer $\\hat{w}$ is always unique for any dataset $D$.",
-    options: [{ id: "A", text: "True" }, { id: "B", text: "False" }],
-    correctOptionId: "B",
-    explanation: "When the feature dimension $d > N$, the design matrix $X$ need not have full column rank. Then multiple parameter vectors can attain the same global minimum, so the empirical risk minimizer is not always unique.",
-    topic: "Kernels & Regression",
-    difficulty: "Foundation",
-    source: "HS25 · Question 2 · 1 point",
-  },
-  {
-    id: "hs25-q05-penalty",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 5,
-    title: "Lasso and ridge sparsity",
-    prompt: "The lasso penalty encourages sparsity, i.e., coefficients being exactly zero, while the ridge penalty only shrinks coefficients towards zero.",
-    options: [{ id: "A", text: "True" }, { id: "B", text: "False" }],
-    correctOptionId: "A",
-    explanation: "The geometry of the $\\ell_1$-ball used by Lasso has sharp corners on the coordinate axes, which makes solutions with exactly zero coefficients common. The smooth $\\ell_2$-ball used by Ridge shrinks coefficients toward zero but typically does not set them exactly to zero.",
-    topic: "Kernels & Regression",
-    difficulty: "Foundation",
-    source: "HS25 · Question 5 · 1 point",
-  },
-  {
-    id: "hs25-q15",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 15,
-    title: "Weight decay as L2 regularization",
-    prompt: "We train a neural network with parameters $\\theta \\in \\mathbb{R}^d$. With learning rate $\\eta > 0$ and weight decay $\\alpha > 0$, the update while minimizing $L_1(\\theta)$ is\n\n$$\\theta^{(t+1)} = \\theta^{(t)}(1 - \\alpha) - \\eta \\nabla L_1(\\theta^{(t)}).$$\n\nIn a second run we minimize $L_2(\\theta)$ with the same learning rate but without weight decay:\n\n$$\\theta^{(t+1)} = \\theta^{(t)} - \\eta \\nabla L_2(\\theta^{(t)}).$$\n\nWhat must $L_2(\\theta)$ be for the two gradient updates to be identical for any $\\alpha$ and $\\eta$?",
-    options: [
-      { id: "A", text: "$L_2(\\theta) = L_1(\\theta) + \\frac{\\alpha}{2\\eta} \\lVert\\theta\\rVert_2^2$" },
-      { id: "B", text: "$L_2(\\theta) = L_1(\\theta) + \\frac{\\alpha}{\\eta} \\lVert\\theta\\rVert_2^2$" },
-      { id: "C", text: "$L_2(\\theta) = L_1(\\theta) + \\frac{\\alpha}{2} \\lVert\\theta\\rVert_2^2$" },
-      { id: "D", text: "$L_2(\\theta) = L_1(\\theta) + \\alpha \\lVert\\theta\\rVert_2^2$" },
-    ],
-    correctOptionId: "A",
-    explanation: "Equating the two updates gives $\\nabla L_2(\\theta) = \\nabla L_1(\\theta) + \\frac{\\alpha}{\\eta}\\theta$. Integrating with respect to $\\theta$ yields $L_2(\\theta) = L_1(\\theta) + \\frac{\\alpha}{2\\eta}\\lVert\\theta\\rVert_2^2$.",
-    topic: "Neural Networks",
-    difficulty: "Advanced",
-    source: "HS25 · Question 15 · 4 points",
-  },
-  {
-    id: "hs25-q22",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 22,
-    title: "Irreducible noise",
-    prompt: "Irreducible noise can be reduced by increasing the model's capacity.",
-    options: [{ id: "A", text: "True" }, { id: "B", text: "False" }],
-    correctOptionId: "B",
-    explanation: "Irreducible noise $\\sigma^2$ is inherent to the data-generating distribution and cannot be reduced by changing the model capacity or model class.",
-    topic: "Kernels & Regression",
-    difficulty: "Foundation",
-    source: "HS25 · Question 22 · 1 point",
-  },
-  {
-    id: "hs25-q25",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 25,
-    title: "Closed-form ridge solution",
-    prompt: "Does there always exist a closed form solution for $\\hat{w} = \\operatorname{argmin}_{w\\in\\mathbb{R}^d} L(w)$ for Ridge regression?",
-    options: [{ id: "A", text: "True" }, { id: "B", text: "False" }],
-    correctOptionId: "A",
-    explanation: "Yes. With $\\lambda > 0$, the Ridge penalty makes $X^\\top X + N\\lambda I_d$ strictly positive definite and therefore invertible, yielding a unique closed-form solution.",
-    topic: "Kernels & Regression",
-    difficulty: "Intermediate",
-    source: "HS25 · Question 25 · 2 points",
-  },
-  {
-    id: "hs25-q26",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 26,
-    title: "Ridge gradient-descent contraction matrix",
-    prompt: "We would like to find the learning rates $\\eta$ for which gradient descent converges to the Ridge minimizer $\\hat{w}$. We seek an expression of the form\n\n$$w^{(t)} - \\hat{w} = M^t(w^{(0)} - \\hat{w}),$$\n\nwhere $M$ is a $d \\times d$ matrix. The update is $w^{(t+1)} = w^{(t)} - \\eta \\nabla L(w^{(t)})$. What is the correct expression for $M$?",
-    options: [
-      { id: "A", text: "$M = I_d - 2\\eta(X^\\top X + \\lambda I_d)$" },
-      { id: "B", text: "$M = I_d - \\frac{2\\eta}{N}(X^\\top X + \\lambda I_d)$" },
-      { id: "C", text: "$M = \\left(I_d - \\frac{2\\eta}{N}(X^\\top X + N\\lambda I_d)\\right)^{-1}$" },
-      { id: "D", text: "$M = \\left(I_d - 2\\eta(X^\\top X + \\lambda I_d)\\right)^{-1}$" },
-      { id: "E", text: "$M = I_d - \\frac{2\\eta}{N}(X^\\top X + N\\lambda I_d)$" },
-      { id: "F", text: "$M = I_d - 2\\eta(X^\\top X + N\\lambda I_d)$" },
-    ],
-    correctOptionId: "E",
-    explanation: "Using the scaling in the supplied exam, subtracting the optimality condition $\\nabla L(\\hat{w})=0$ from the gradient-descent update gives\n\n$$w^{(t+1)} - \\hat{w} = \\left[I_d - \\frac{2\\eta}{N}(X^\\top X + N\\lambda I_d)\\right](w^{(t)} - \\hat{w}).$$\n\nTherefore $M = I_d - \\frac{2\\eta}{N}(X^\\top X + N\\lambda I_d)$, which is option E.",
-    topic: "Kernels & Regression",
-    difficulty: "Advanced",
-    source: "HS25 · Question 26 · 4 points",
-  },
-  {
-    id: "hs25-q38",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 38,
-    title: "Beta-Bernoulli posterior",
-    prompt: "We model coin flips as independent Bernoulli draws with unknown probability of heads $\\theta \\in (0,1)$. We assume $\\theta \\sim \\operatorname{Beta}(1,1)$ and observe heads ($x_1=1$), then tails ($x_2=0$). What is the posterior distribution after both observations?",
-    options: [
-      { id: "A", text: "$\\operatorname{Beta}(3,1)$" },
-      { id: "B", text: "$\\operatorname{Beta}(2,1)$" },
-      { id: "C", text: "$\\operatorname{Beta}(1,2)$" },
-      { id: "D", text: "$\\operatorname{Beta}(2,2)$" },
-    ],
-    correctOptionId: "D",
-    explanation: "By Beta-Bernoulli conjugacy, $\\theta \\mid D \\sim \\operatorname{Beta}(\\alpha + N_{heads}, \\beta + N_{tails}) = \\operatorname{Beta}(1+1, 1+1) = \\operatorname{Beta}(2,2)$.",
-    topic: "Probabilistic Modeling",
-    difficulty: "Intermediate",
-    source: "HS25 · Question 38 · 3 points",
-  },
-  {
-    id: "hs25-q40",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 40,
-    title: "Laplace mixture E-step responsibility",
-    setup: LAPLACE_GMM_SETUP,
-    prompt: "In the E-step, what is the posterior group probability $p(z=1 \\mid x; \\theta)$?",
-    options: [
-      { id: "A", text: "$\\frac{1}{1 + \\frac{q b_0}{(1-q)b_1} \\exp\\left( \\frac{|x-\\mu_1|}{b_1} - \\frac{|x-\\mu_0|}{b_0} \\right)}$" },
-      { id: "B", text: "$\\frac{1}{1 + \\frac{(1-q)b_1}{q b_0} \\exp\\left( \\frac{|x-\\mu_1|}{b_1} - \\frac{|x-\\mu_0|}{b_0} \\right)}$" },
-      { id: "C", text: "$\\frac{1}{1 + \\frac{q b_0}{(1-q)b_1} \\exp\\left( \\frac{|x-\\mu_0|}{b_0} - \\frac{|x-\\mu_1|}{b_1} \\right)}$" },
-      { id: "D", text: "$\\frac{1}{1 + \\frac{(1-q)b_1}{q b_0} \\exp\\left( \\frac{|x-\\mu_0|}{b_0} - \\frac{|x-\\mu_1|}{b_1} \\right)}$" },
-    ],
-    correctOptionId: "B",
-    explanation: "Bayes' rule gives $p(z=1\\mid x) = \\frac{q p(x\\mid z=1)}{q p(x\\mid z=1) + (1-q)p(x\\mid z=0)}$. Substituting the two Laplace densities and simplifying gives option B.",
-    topic: "Probabilistic Modeling",
-    difficulty: "Advanced",
-    source: "HS25 · Question 40 · 4 points",
-  },
-  {
-    id: "hs25-q41",
-    examId: "HS25",
-    examLabel: "HS25 · February 2026",
-    number: 41,
-    title: "Laplace mixture mixing-weight update",
-    setup: LAPLACE_GMM_SETUP,
-    prompt: "In the M-step, what is the update for the prior probability $q$?",
-    options: [
-      { id: "A", text: "$q = \\frac{1}{N} \\sum_{n=1}^N \\gamma_0(x_n)$" },
-      { id: "B", text: "$q = \\frac{1}{N} \\sum_{n=1}^N \\gamma_1(x_n)$" },
-      { id: "C", text: "$q = \\frac{\\sum_{n=1}^N \\gamma_0(x_n)}{\\sum_{n=1}^N \\gamma_1(x_n)}$" },
-      { id: "D", text: "$q = \\frac{\\sum_{n=1}^N \\gamma_1(x_n)}{\\sum_{n=1}^N \\gamma_0(x_n)}$" },
-    ],
-    correctOptionId: "B",
-    explanation: "Maximizing the expected complete-data log-likelihood with respect to the mixture weight gives $q = \\frac{1}{N}\\sum_{n=1}^N \\gamma_1(x_n)$.",
-    topic: "Probabilistic Modeling",
-    difficulty: "Advanced",
-    source: "HS25 · Question 41 · 4 points",
-  },
+const EXAM_ID = "HS25";
+const EXAM_LABEL = "HS25 · February 2026";
+const tf = (): QuestionOption[] => [{ id: "A", text: "True" }, { id: "B", text: "False" }];
+const opts = (...items: Array<[OptionId, string]>): QuestionOption[] => items.map(([id, text]) => ({ id, text }));
+
+function stableId(number: number) {
+  if (number === 5) return "hs25-q05-penalty";
+  if (number === 6) return "hs25-q05"; // legacy id retained so existing progress for this question survives.
+  return `hs25-q${String(number).padStart(2, "0")}`;
+}
+
+function q({
+  number,
+  points,
+  title,
+  prompt,
+  options,
+  correct,
+  topic,
+  difficulty = "Intermediate",
+  setup,
+  multipleSelect = false,
+  figureNumber,
+  figure,
+  figureAlt,
+  figureCaption,
+  explanation,
+}: {
+  number: number;
+  points: number;
+  title: string;
+  prompt: string;
+  options: QuestionOption[];
+  correct: OptionId[];
+  topic: Topic;
+  difficulty?: Difficulty;
+  setup?: string;
+  multipleSelect?: boolean;
+  figureNumber?: number;
+  figure?: string;
+  figureAlt?: string;
+  figureCaption?: string;
+  explanation: string;
+}): Question {
+  return {
+    id: stableId(number),
+    examId: EXAM_ID,
+    examLabel: EXAM_LABEL,
+    number,
+    title,
+    setup,
+    prompt,
+    options,
+    correctOptionId: correct[0],
+    correctOptionIds: correct,
+    multipleSelect,
+    explanation,
+    topic,
+    difficulty,
+    source: `HS25 · Question ${number} · ${points} point${points === 1 ? "" : "s"}`,
+    figureNumber,
+    figure,
+    figureAlt,
+    figureCaption,
+  };
+}
+
+const LINEAR_SETUP = "For Questions 1 to 4, consider a dataset $D=\\{(x_1,y_1),\\ldots,(x_N,y_N)\\}$, where $x_n\\in\\mathbb{R}^d$ and $y_n\\in\\mathbb{R}$. Let $X\\in\\mathbb{R}^{N\\times d}$ and $y\\in\\mathbb{R}^N$. We fit linear regression with no intercept, $f_w(x)=w^\\top x$, using the squared error loss $$L(w,D)=\\sum_{n=1}^N (y_n-f_w(x_n))^2.$$ Let $\\hat w$ minimize this loss.";
+const KERNEL_SETUP = "For the following questions, you are given any two valid kernels $k_1$ and $k_2$.";
+const RBF_SETUP = "For Questions 9 to 11, we solve a binary classification problem with $x\\in\\mathbb{R}^2$ and $y\\in\\{-1,1\\}$ using a kernel SVM with Gaussian RBF kernel $$k(x,x')=\\exp\\left(-\\frac{\\lVert x-x'\\rVert^2}{\\sigma^2}\\right).$$ We train three classifiers with $\\sigma_1=0.1$, $\\sigma_2=0.7$, and $\\sigma_3=7$. Each corresponds to one plot in Figure 1.";
+const WEIGHT_DECAY_SETUP = "We train a neural network with parameters $\\theta\\in\\mathbb{R}^d$. With learning rate $\\eta>0$ and weight decay $\\alpha>0$, the update while minimizing $L_1$ is $$\\theta^{(t+1)}=\\theta^{(t)}(1-\\alpha)-\\eta\\nabla L_1(\\theta^{(t)}).$$ In a second run we minimize $L_2$ with the same learning rate but without weight decay: $$\\theta^{(t+1)}=\\theta^{(t)}-\\eta\\nabla L_2(\\theta^{(t)}).$$";
+const IMAGE_SETUP = "Consider a $k$-class image-classification dataset $\\{(x_1,y_1),\\ldots,(x_N,y_N)\\}$ with one-hot labels $y_n\\in\\{0,1\\}^k$. A CNN $f(x;\\theta)$ outputs a $k$-dimensional logit vector.";
+const CNN_FILTER_SETUP = "After training the network, we visualize learned filters in Figure 4. The first row shows the two-dimensional filters $F_1,\\ldots,F_4$. The second row shows convolutions $O_i=I*F_j$, where $i$ and $j$ are not necessarily equal. Lighter colors indicate higher values.";
+const BIAS_VARIANCE_SETUP = "For Questions 22 to 24, the expected squared-loss generalization error is decomposed as $$L(\\hat f_D)=\\underbrace{\\mathbb E_{X,D}[(\\hat f_D(X)-\\mathbb E_D[\\hat f_D(X)])^2]}_{(A)}+\\underbrace{\\mathbb E_X[(\\mathbb E_D[\\hat f_D(X)]-f^*(X))^2]}_{(B)}+\\underbrace{\\mathbb E_{X,Y}[(f^*(X)-Y)^2]}_{(C)},$$ where $f^*(X)=\\mathbb E[Y\\mid X]$.";
+const RIDGE_SETUP = "For Questions 25 to 27, consider Ridge regression $$L(w)=\\frac{1}{N}\\lVert y-Xw\\rVert_2^2+\\lambda\\lVert w\\rVert_2^2,\\qquad \\lambda>0,$$ with minimizer $\\hat w$.";
+const KMEANS_SETUP = "For Questions 30 and 31, run k-means++ initialization with Euclidean distance on the three points $A=(1,1)$, $B=(1,4)$, and $C=(6,1)$ shown in Figure 5.";
+const CLUSTER_HEURISTIC_SETUP = "For Questions 32 and 33, we cluster $\\{x_1,\\ldots,x_N\\}$ into two clusters using nearest-center assignments in Euclidean distance and compare two center updates: $$\\mathrm{update}_1:\\;\\mu_j\\leftarrow\\operatorname{median}\\{x_n:z_n=j\\},\\qquad \\mathrm{update}_2:\\;\\mu_j\\leftarrow\\frac{1}{N_j}\\sum_{n:z_n=j}x_n.$$ The median is computed element-wise.";
+const PCA_SETUP = "For centered data $x_n\\in\\mathbb{R}^d$ with $\\sum_n x_n=0$, PCA solves $$L^{(k)}=\\min_{W,z_1,\\ldots,z_N}\\frac1N\\sum_{n=1}^N\\lVert Wz_n-x_n\\rVert_2^2\\quad\\text{s.t. }W^\\top W=I_k.$$";
+const EM_SETUP = "We model gym arrival times $x_n\\in\\mathbb{R}$ with two Laplace mixture components. Let $z_n\\in\\{0,1\\}$ with $p(z_n=1)=q$, and $$x_n\\mid z_n\\sim\\operatorname{Laplace}(\\mu_{z_n},b_{z_n}),\\qquad p(x_n\\mid z_n)=\\frac{1}{2b_{z_n}}\\exp\\left(-\\frac{|x_n-\\mu_{z_n}|}{b_{z_n}}\\right).$$ We use soft EM with responsibilities $\\gamma_k(x_n)=p(z_n=k\\mid x_n)$.";
+
+const completeQuestions: Question[] = [
+  q({ number: 1, points: 1, title: "Squared error can be zero", setup: LINEAR_SETUP, prompt: "For any dataset $D$ and weights $w$, the squared error loss $L(w,D)$ will always be strictly positive.", options: tf(), correct: ["B"], topic: "Kernels & Regression", difficulty: "Foundation", explanation: "Squared error is nonnegative, but it need not be strictly positive. If the model interpolates every observation, every residual is zero and therefore $L(w,D)=0$." }),
+  q({ number: 2, points: 3, title: "Uniqueness of linear regression", setup: LINEAR_SETUP, prompt: "Let $N=50$ and $d=2$. For which of the following datasets does linear regression have a unique optimal solution $\\hat w$? Mark all that apply.", options: opts(["A", "$D_A=\\{((1,1),2)\\}_{n=1}^N$"], ["B", "$D_B=\\{((1,1),4)\\}\\cup\\{((1,1),2)\\}_{n=2}^N$"], ["C", "$D_C=\\{((5,3),4)\\}\\cup\\{((1,1),2)\\}_{n=2}^N$"]), correct: ["C"], multipleSelect: true, topic: "Kernels & Regression", difficulty: "Intermediate", explanation: "A least-squares minimizer is unique exactly when $X$ has full column rank. $D_A$ and $D_B$ contain only the feature vector $(1,1)$, so their design matrices have rank 1. $D_C$ contains $(5,3)$ and $(1,1)$, which are linearly independent, so $X$ has rank 2 and the optimum is unique." }),
+  q({ number: 3, points: 1, title: "Absolute versus squared error", setup: LINEAR_SETUP, prompt: "Train a new linear model on dataset $D_C$ from Question 2, but minimize the absolute error $\\sum_{n=1}^N|y_n-f_w(x_n)|$. The optimal linear model for absolute error has the same parameters as the optimal linear model for squared error.", options: tf(), correct: ["A"], topic: "Kernels & Regression", difficulty: "Intermediate", explanation: "For $D_C$, the two distinct feature vectors give the equations $w_1+w_2=2$ and $5w_1+3w_2=4$, whose unique solution is $w=(-1,3)$. It makes every residual zero, so it simultaneously minimizes both squared and absolute error." }),
+  q({ number: 4, points: 2, title: "Linear regression gradient", setup: LINEAR_SETUP, prompt: "Initialize $w=(0,0)$ and take one gradient-descent step using dataset $D_A$ from Question 2. What is the gradient of the squared error loss with respect to $w$ at this initialization?", options: opts(["A", "$\\nabla_wL=(-4,-200)$"], ["B", "$\\nabla_wL=(-4,-4)$"], ["C", "$\\nabla_wL=(-200,-200)$"], ["D", "$\\nabla_wL=(-200,-4)$"]), correct: ["C"], topic: "Kernels & Regression", difficulty: "Intermediate", explanation: "For every one of the 50 observations, $x=(1,1)$ and $y=2$. Since $\\nabla_w(y-w^Tx)^2=-2(y-w^Tx)x$, at $w=0$ the contribution is $(-4,-4)$. Summing 50 contributions gives $(-200,-200)$." }),
+  q({ number: 5, points: 1, title: "Lasso sparsity", prompt: "The lasso penalty encourages sparsity, i.e., coefficients being exactly zero, while the ridge penalty only shrinks coefficients towards zero.", options: tf(), correct: ["A"], topic: "Kernels & Regression", difficulty: "Foundation", explanation: "The $\\ell_1$ penalty has corners that make exact zeros common, while the smooth $\\ell_2$ penalty generally shrinks coefficients without setting them exactly to zero." }),
+  q({ number: 6, points: 2, title: "Closed-form Lasso", prompt: "The Lasso solution $\\hat w_{\\mathrm{lasso}}$ can always be computed in closed form via matrix inversion.", options: tf(), correct: ["B"], topic: "Kernels & Regression", difficulty: "Foundation", explanation: "Unlike Ridge regression, Lasso contains the nondifferentiable $\\ell_1$ penalty. In general it has no matrix-inversion closed form and is solved numerically, for example by coordinate descent or proximal methods." }),
+  q({ number: 7, points: 1, title: "Product of kernels", setup: KERNEL_SETUP, prompt: "Is $k(x,x')=\\lambda k_1(x,x')\\,k_2(x,x')$ a valid kernel for any $\\lambda>0$?", options: tf(), correct: ["A"], topic: "Kernels & Regression", difficulty: "Foundation", explanation: "Positive scaling preserves positive semidefiniteness, and the pointwise product of valid kernels is valid by the Schur product theorem." }),
+  q({ number: 8, points: 2, title: "Elementwise minimum of kernels", setup: KERNEL_SETUP, prompt: "Is $k(x,x')=\\min\\{k_1(x,x'),k_2(x,x')\\}$ necessarily a valid kernel? Here, $\\min$ denotes the elementwise minimum.", options: tf(), correct: ["B"], topic: "Kernels & Regression", difficulty: "Intermediate", explanation: "The elementwise minimum does not preserve positive semidefiniteness in general, so it is not a valid kernel construction rule." }),
+  q({ number: 9, points: 1, title: "RBF bandwidth: small", setup: RBF_SETUP, prompt: "Which plot does the classifier with $\\sigma_1$ correspond to?", options: opts(["A", "Plot A"], ["B", "Plot B"], ["C", "Plot C"]), correct: ["B"], topic: "Kernels & Regression", difficulty: "Foundation", figureNumber: 1, figure: "/figures/hs25_figure1.png", figureAlt: "Three RBF SVM decision-boundary plots labelled A, B, and C.", figureCaption: "Figure 1 · Related to Questions 9, 10, and 11.", explanation: "The very small bandwidth $\\sigma_1=0.1$ produces highly local, wiggly decision regions and therefore corresponds to Plot B." }),
+  q({ number: 10, points: 1, title: "RBF bandwidth: moderate", setup: RBF_SETUP, prompt: "Which plot does the classifier with $\\sigma_2$ correspond to?", options: opts(["A", "Plot A"], ["B", "Plot B"], ["C", "Plot C"]), correct: ["A"], topic: "Kernels & Regression", difficulty: "Foundation", figureNumber: 1, figure: "/figures/hs25_figure1.png", figureAlt: "Three RBF SVM decision-boundary plots labelled A, B, and C.", figureCaption: "Figure 1 · Related to Questions 9, 10, and 11.", explanation: "The intermediate bandwidth $\\sigma_2=0.7$ gives the smooth nonlinear boundary in Plot A." }),
+  q({ number: 11, points: 1, title: "RBF bandwidth: large", setup: RBF_SETUP, prompt: "Which plot does the classifier with $\\sigma_3$ correspond to?", options: opts(["A", "Plot A"], ["B", "Plot B"], ["C", "Plot C"]), correct: ["C"], topic: "Kernels & Regression", difficulty: "Foundation", figureNumber: 1, figure: "/figures/hs25_figure1.png", figureAlt: "Three RBF SVM decision-boundary plots labelled A, B, and C.", figureCaption: "Figure 1 · Related to Questions 9, 10, and 11.", explanation: "With the very large bandwidth $\\sigma_3=7$, the RBF varies slowly and the decision boundary is nearly linear, matching Plot C." }),
+
+  q({ number: 12, points: 1, title: "Linear neural networks", prompt: "Consider a feed-forward neural network with linear activation functions, $\\phi(z)=z$. This network can learn non-linear decision boundaries if it has enough hidden layers.", options: tf(), correct: ["B"], topic: "Neural Networks", difficulty: "Foundation", explanation: "A composition of affine/linear maps is still affine/linear. Adding hidden layers without nonlinear activations therefore cannot create a nonlinear decision boundary." }),
+  q({ number: 13, points: 2, title: "Learning-rate loss curves", prompt: "We use three learning rates $\\eta_1,\\eta_2,\\eta_3$ to train identical neural networks with gradient descent using the same loss. Figure 2 shows the loss curves. What is the correct ordering? Note that each panel has a different y-axis scale.", options: opts(["A", "$\\eta_1<\\eta_2<\\eta_3$"], ["B", "$\\eta_2<\\eta_1<\\eta_3$"], ["C", "$\\eta_1<\\eta_3<\\eta_2$"], ["D", "$\\eta_3<\\eta_2<\\eta_1$"]), correct: ["C"], topic: "Neural Networks", difficulty: "Intermediate", figureNumber: 2, figureCaption: "Figure 2 placeholder · Learning-rate loss curves for $\\eta_1,\\eta_2,\\eta_3$. Add the source figure in the editor.", explanation: "$\\eta_1$ is so small that learning is very slow; $\\eta_3$ converges rapidly; $\\eta_2$ is too large and oscillates strongly. Hence $\\eta_1<\\eta_3<\\eta_2$." }),
+  q({ number: 14, points: 2, title: "Initialization variance", prompt: "Suppose the weights of a ReLU feed-forward neural network are initialized with $\\mathcal N(0,\\sigma^2)$ and the biases are constant. We initialize using variances $\\sigma_1^2$ and $\\sigma_2^2$, then train with the same learning rate and loss. Figure 3 shows the resulting loss curves. What is the correct ordering?", options: opts(["A", "$\\sigma_1<\\sigma_2$"], ["B", "$\\sigma_2<\\sigma_1$"]), correct: ["A"], topic: "Neural Networks", difficulty: "Intermediate", figureNumber: 3, figureCaption: "Figure 3 placeholder · Loss curves for initializations $\\sigma_1$ and $\\sigma_2$. Add the source figure in the editor.", explanation: "In Figure 3, the run labelled $\\sigma_1$ is effectively stuck while the run labelled $\\sigma_2$ learns. This corresponds to the smaller initialization scale being $\\sigma_1$, hence $\\sigma_1<\\sigma_2$." }),
+  q({ number: 15, points: 4, title: "Weight decay as regularization", setup: WEIGHT_DECAY_SETUP, prompt: "What must $L_2(\\theta)$ be for the gradient updates to be identical in the two training runs for any $\\alpha$ and $\\eta$?", options: opts(["A", "$L_2=L_1+\\alpha\\lVert\\theta\\rVert_2^2$"], ["B", "$L_2=(1-\\alpha/\\eta)L_1+\\lVert\\theta\\rVert_2^2$"], ["C", "$L_2=L_1+\\frac{\\alpha}{2}\\lVert\\theta\\rVert_2^2$"], ["D", "$L_2=L_1+\\frac{\\alpha}{2\\eta}\\lVert\\theta\\rVert_2^2$"], ["E", "$L_2=L_1+\\frac{1-\\alpha}{2}\\lVert\\theta\\rVert_2^2$"], ["F", "$L_2=L_1+(1-\\alpha/\\eta)\\lVert\\theta\\rVert_2^2$"]), correct: ["D"], topic: "Neural Networks", difficulty: "Advanced", explanation: "Equating the updates requires $\\nabla L_2=\\nabla L_1+(\\alpha/\\eta)\\theta$. Since $\\nabla(\\frac12\\lVert\\theta\\rVert_2^2)=\\theta$, this gives $L_2=L_1+\\frac{\\alpha}{2\\eta}\\lVert\\theta\\rVert_2^2$." }),
+  q({ number: 16, points: 1, title: "Weight decay and overfitting", prompt: "Weight decay helps to avoid overfitting.", options: tf(), correct: ["A"], topic: "Neural Networks", difficulty: "Foundation", explanation: "Weight decay regularizes the parameters by discouraging large weights, which can reduce model complexity and overfitting." }),
+  q({ number: 17, points: 2, title: "Cross-entropy from logits", setup: IMAGE_SETUP, prompt: "Which loss is equal to the cross-entropy loss for training the $k$-class classifier? Here $y_{n,j}$ is the $j$-th one-hot target and $f_j(x_n;\\theta)$ is the $j$-th logit.", options: opts(["A", "$L=\\frac1N\\sum_n\\lVert y_n-f(x_n;\\theta)\\rVert_2^2$"], ["B", "$L=\\frac1N\\sum_n\\mathbf1[y_n\\neq f(x_n;\\theta)]$"], ["C", "$L=-\\frac1N\\sum_n\\sum_j y_{n,j}\\log\\left(\\frac{e^{f_j(x_n;\\theta)}}{\\sum_l e^{f_l(x_n;\\theta)}}\\right)$"], ["D", "$L=-\\frac1N\\sum_n\\sum_j y_{n,j}\\log(f_j(x_n;\\theta))$"], ["E", "$L=\\frac1N\\sum_n\\sum_j\\left(y_{n,j}-\\frac{e^{f_j(x_n;\\theta)}}{\\sum_l e^{f_l(x_n;\\theta)}}\\right)^2$"]), correct: ["C"], topic: "Neural Networks", difficulty: "Intermediate", explanation: "Cross-entropy with logits first converts logits to class probabilities with softmax and then applies the negative log-likelihood of the one-hot target, exactly as in option C." }),
+  q({ number: 18, points: 1, title: "CNN filter $F_1$", setup: CNN_FILTER_SETUP, prompt: "Which output belongs to filter $F_1$?", options: opts(["A", "$O_1$"], ["B", "$O_2$"], ["C", "$O_3$"], ["D", "$O_4$"]), correct: ["B"], topic: "Neural Networks", difficulty: "Foundation", figureNumber: 4, figure: "/figures/hs25_figure4.png", figureAlt: "Input digit, four learned 5 by 5 filters, and four convolution outputs.", figureCaption: "Figure 4 · Related to Questions 18–20.", explanation: "Matching the spatial response pattern of $F_1$ to the four output maps gives $O_2$." }),
+  q({ number: 19, points: 1, title: "CNN filter $F_3$", setup: CNN_FILTER_SETUP, prompt: "Which output belongs to filter $F_3$?", options: opts(["A", "$O_1$"], ["B", "$O_2$"], ["C", "$O_3$"], ["D", "$O_4$"]), correct: ["C"], topic: "Neural Networks", difficulty: "Foundation", figureNumber: 4, figure: "/figures/hs25_figure4.png", figureAlt: "Input digit, four learned 5 by 5 filters, and four convolution outputs.", figureCaption: "Figure 4 · Related to Questions 18–20.", explanation: "Matching the localized center-surround response of $F_3$ to the output maps gives $O_3$." }),
+  q({ number: 20, points: 1, title: "CNN filter $F_4$", setup: CNN_FILTER_SETUP, prompt: "Which output belongs to filter $F_4$?", options: opts(["A", "$O_1$"], ["B", "$O_2$"], ["C", "$O_3$"], ["D", "$O_4$"]), correct: ["D"], topic: "Neural Networks", difficulty: "Foundation", figureNumber: 4, figure: "/figures/hs25_figure4.png", figureAlt: "Input digit, four learned 5 by 5 filters, and four convolution outputs.", figureCaption: "Figure 4 · Related to Questions 18–20.", explanation: "Matching $F_4$ to the corresponding convolution response gives $O_4$." }),
+  q({ number: 21, points: 4, title: "Convolutional parameter savings", setup: IMAGE_SETUP, prompt: "Inputs are $10\\times10$ images with 2 channels. The first CNN layer has 10 filters of size $3\\times3$, for a total of $m_1$ parameters. A fully-connected layer with 180 nodes takes the flattened image as input, for a total of $m_2$ parameters. Both include biases. What is $m_2/m_1$?", options: opts(["A", "$190.4$"], ["B", "$200$"], ["C", "$201$"], ["D", "$402$"], ["E", "$361.8$"]), correct: ["A"], topic: "Neural Networks", difficulty: "Advanced", explanation: "The convolutional layer has $m_1=10(3\\cdot3\\cdot2+1)=190$ parameters. The dense layer has $m_2=180(10\\cdot10\\cdot2+1)=36180$. Thus $m_2/m_1\\approx190.4$." }),
+
+  q({ number: 22, points: 2, title: "Bias term", setup: BIAS_VARIANCE_SETUP, prompt: "Which term characterizes the bias of $\\hat f_D$?", options: opts(["A", "Term (A)"], ["B", "Term (B)"], ["C", "Term (C)"], ["D", "None of the above"]), correct: ["B"], topic: "Optimization & Model Selection", difficulty: "Foundation", explanation: "Term (B) is the squared difference between the average learned predictor and the ground-truth regression function, so it is the squared bias term." }),
+  q({ number: 23, points: 2, title: "Irreducible noise and function class", setup: BIAS_VARIANCE_SETUP, prompt: "Consider Term (C), $\\mathbb E[(f^*(X)-Y)^2]$. How does enlarging the function class in which we search for $\\hat f_D$ affect this term?", options: opts(["A", "It is likely to increase."], ["B", "It is likely to decrease."], ["C", "It will not change regardless of the function class."]), correct: ["C"], topic: "Optimization & Model Selection", difficulty: "Foundation", explanation: "Term (C) is the irreducible noise of the data-generating distribution. It depends on $Y\\mid X$, not on the hypothesis class used to train $\\hat f_D$." }),
+  q({ number: 24, points: 1, title: "Ground-truth generalization error", setup: BIAS_VARIANCE_SETUP, prompt: "The ground-truth function $f^*$ always has zero generalization error.", options: tf(), correct: ["B"], topic: "Optimization & Model Selection", difficulty: "Foundation", explanation: "Even the conditional mean $f^*(X)=\\mathbb E[Y\\mid X]$ incurs the irreducible-noise term $\\mathbb E[(f^*(X)-Y)^2]$, which need not be zero." }),
+  q({ number: 25, points: 2, title: "Closed-form Ridge solution", setup: RIDGE_SETUP, prompt: "Does there always exist a closed-form solution for $\\hat w$?", options: tf(), correct: ["A"], topic: "Optimization & Model Selection", difficulty: "Intermediate", explanation: "Because $\\lambda>0$, $X^TX+N\\lambda I_d$ is positive definite and invertible. Hence Ridge has the closed-form solution $\\hat w=(X^TX+N\\lambda I_d)^{-1}X^Ty$." }),
+  q({ number: 26, points: 4, title: "Gradient-descent contraction matrix", setup: RIDGE_SETUP, prompt: "We seek $w^{(t)}-\\hat w=M^t(w^{(0)}-\\hat w)$ for gradient descent $w^{(t+1)}=w^{(t)}-\\eta\\nabla L(w^{(t)})$. What is $M$?", options: opts(["A", "$I_d-2\\eta(X^TX+\\lambda I_d)$"], ["B", "$I_d-\\frac{2\\eta}{N}(X^TX+\\lambda I_d)$"], ["C", "$\\left(I_d-\\frac{2\\eta}{N}(X^TX+N\\lambda I_d)\\right)^{-1}$"], ["D", "$\\left(I_d-2\\eta(X^TX+\\lambda I_d)\\right)^{-1}$"], ["E", "$I_d-\\frac{2\\eta}{N}(X^TX+N\\lambda I_d)$"], ["F", "$I_d-2\\eta(X^TX+N\\lambda I_d)$"]), correct: ["E"], topic: "Optimization & Model Selection", difficulty: "Advanced", explanation: "$\\nabla L(w)=\\frac{2}{N}X^T(Xw-y)+2\\lambda w$. Subtracting the fixed-point equation at $\\hat w$ gives $w^{(t+1)}-\\hat w=[I_d-\\frac{2\\eta}{N}(X^TX+N\\lambda I_d)](w^{(t)}-\\hat w)$." }),
+  q({ number: 27, points: 3, title: "Mini-batch SGD", setup: RIDGE_SETUP, prompt: "Let $\\nabla L(w)=\\frac1N\\sum_{n=1}^N\\nabla_w\\ell(f_w(x_n),y_n)$ and $\\nabla L_S(w)=\\frac1{|S|}\\sum_{n\\in S}\\nabla_w\\ell(f_w(x_n),y_n)$, with $|S|<N$. Which statements are true? Mark all that apply.", options: opts(["A", "Each mini-batch SGD iteration requires fewer computations than a full-batch gradient-descent iteration."], ["B", "If mini-batch points are selected uniformly, independently, and with replacement, $\\mathbb E[\\nabla L_S(w)]=\\nabla L(w)$ for all $w$."], ["C", "Mini-batch SGD offers no advantages beyond computational advantages."]), correct: ["A", "B"], multipleSelect: true, topic: "Optimization & Model Selection", difficulty: "Intermediate", explanation: "A uses fewer data points per update, so it is cheaper. B is the unbiased-gradient property under uniform independent sampling. C is false: stochasticity can also have optimization and generalization benefits." }),
+
+  q({ number: 28, points: 1, title: "Lloyd's heuristic", prompt: "Lloyd's heuristic, also known as the k-means clustering algorithm, always converges to the cluster centers that minimize the sum of squared $\\ell_2$ distances between points and their closest centers.", options: tf(), correct: ["B"], topic: "Clustering & Dimensionality Reduction", difficulty: "Foundation", explanation: "Lloyd's algorithm decreases the k-means objective and converges to a local fixed point, but it is not guaranteed to find the global minimum." }),
+  q({ number: 29, points: 1, title: "Choosing the number of clusters", prompt: "The number of clusters used for k-means clustering with Lloyd's heuristic cannot be chosen using cross-validation.", options: tf(), correct: ["B"], topic: "Clustering & Dimensionality Reduction", difficulty: "Foundation", explanation: "The number of clusters is a hyperparameter and can be compared using held-out data and an appropriate validation criterion, so it is not fundamentally impossible to choose it by cross-validation." }),
+  q({ number: 30, points: 1, title: "k-means++ first center", setup: KMEANS_SETUP, prompt: "What is the probability of selecting point $A$ as the first cluster center?", options: opts(["A", "$3/8$"], ["B", "$1/3$"], ["C", "$1/2$"], ["D", "$9/34$"]), correct: ["B"], topic: "Clustering & Dimensionality Reduction", difficulty: "Foundation", figureNumber: 5, figure: "/figures/hs25_figure5.png", figureAlt: "Three points A=(1,1), B=(1,4), and C=(6,1).", figureCaption: "Figure 5 · Related to Questions 30 and 31.", explanation: "k-means++ chooses the first center uniformly from the data points. With three points, $P(A)=1/3$." }),
+  q({ number: 31, points: 3, title: "k-means++ second center", setup: KMEANS_SETUP, prompt: "Assume point $A$ is the first cluster center. What is the probability of selecting point $B$ as the second center?", options: opts(["A", "$3/8$"], ["B", "$1/3$"], ["C", "$1/2$"], ["D", "$9/34$"]), correct: ["D"], topic: "Clustering & Dimensionality Reduction", difficulty: "Intermediate", figureNumber: 5, figure: "/figures/hs25_figure5.png", figureAlt: "Three points A=(1,1), B=(1,4), and C=(6,1).", figureCaption: "Figure 5 · Related to Questions 30 and 31.", explanation: "After choosing $A$, k-means++ weights by squared distance: $D(B,A)^2=9$ and $D(C,A)^2=25$. Thus $P(B)=9/(9+25)=9/34$." }),
+  q({ number: 32, points: 3, title: "Mean versus median cluster updates", setup: CLUSTER_HEURISTIC_SETUP, prompt: "For fixed assignments, let $L_1=\\sum_n\\min\\{\\lVert x_n-\\mu_1\\rVert_2^2,\\lVert x_n-\\mu_2\\rVert_2^2\\}$ and $L_2=\\sum_n\\min\\{\\lVert x_n-\\mu_1\\rVert_1,\\lVert x_n-\\mu_2\\rVert_1\\}$. Which update minimizes each loss?", options: opts(["A", "$L_1\\leftrightarrow\\mathrm{update}_1$ and $L_2\\leftrightarrow\\mathrm{update}_1$"], ["B", "$L_1\\leftrightarrow\\mathrm{update}_1$ and $L_2\\leftrightarrow\\mathrm{update}_2$"], ["C", "$L_1\\leftrightarrow\\mathrm{update}_2$ and $L_2\\leftrightarrow\\mathrm{update}_1$"], ["D", "$L_1\\leftrightarrow\\mathrm{update}_2$ and $L_2\\leftrightarrow\\mathrm{update}_2$"]), correct: ["C"], topic: "Clustering & Dimensionality Reduction", difficulty: "Intermediate", explanation: "The arithmetic mean minimizes the sum of squared Euclidean distances, while the coordinate-wise median minimizes the sum of $\\ell_1$ distances. Hence $L_1$ uses update 2 and $L_2$ uses update 1." }),
+  q({ number: 33, points: 4, title: "Robust clustering updates", setup: CLUSTER_HEURISTIC_SETUP, prompt: "Figure 6 shows datasets $D_1$ and $D_2$, their desired two-cluster coloring, and the initial centers. Which statements are correct with this initialization? Mark all that apply.", options: opts(["A", "Neither update 1 nor update 2 recovers the clustering for $D_2$."], ["B", "Update 2 recovers the clusters from $D_1$, and update 1 recovers the clusters from $D_2$."], ["C", "Update 2 recovers the clusters from $D_2$, and update 1 recovers the clusters from $D_1$."], ["D", "Update 1 recovers the clusters from both $D_1$ and $D_2$."], ["E", "Update 2 recovers the clusters from both $D_1$ and $D_2$."]), correct: ["B", "D"], multipleSelect: true, topic: "Clustering & Dimensionality Reduction", difficulty: "Advanced", figureNumber: 6, figureCaption: "Figure 6 placeholder · Datasets $D_1$ and $D_2$ with initial cluster centers. Add the source figure in the editor.", explanation: "Both updates recover the well-separated $D_1$. In $D_2$, the mean is pulled strongly toward the far group and can change the assignments, while the coordinate-wise median is robust to that imbalance and recovers the intended clustering. Therefore B and D are correct." }),
+  q({ number: 34, points: 2, title: "Linear autoencoders and PCA", prompt: "If the activation functions in an autoencoder are the identity function and the loss is squared error, then the autoencoder with bottleneck dimension $m$ that minimizes the loss has the same mean squared reconstruction error as PCA with $m$ components.", options: tf(), correct: ["A"], topic: "Clustering & Dimensionality Reduction", difficulty: "Intermediate", explanation: "A globally optimized linear autoencoder with squared reconstruction loss learns an $m$-dimensional principal subspace, so its optimal reconstruction error equals that of PCA with $m$ components." }),
+  q({ number: 35, points: 3, title: "PCA reconstruction error", setup: PCA_SETUP, prompt: "Let $\\lambda_1\\ge\\lambda_2\\ge\\cdots\\ge\\lambda_d$ be the eigenvalues of $\\sum_{n=1}^N x_nx_n^T$. Which expression equals $L^{(k)}$?", options: opts(["A", "$\\frac1N\\sum_{i=k+1}^d\\lambda_i$"], ["B", "$\\sum_{i=k+1}^d\\lambda_i$"], ["C", "$\\frac1N\\sum_{i=k+1}^d\\lambda_i^2$"], ["D", "$\\sum_{i=k+1}^d\\lambda_i^2$"], ["E", "$\\frac1N\\sum_{i=1}^k\\lambda_i$"], ["F", "$\\sum_{i=1}^k\\lambda_i^2$"]), correct: ["A"], topic: "Clustering & Dimensionality Reduction", difficulty: "Advanced", explanation: "PCA keeps the top $k$ eigen-directions, so the minimum squared reconstruction error is the variance in the discarded directions. Because the matrix here is the unnormalized scatter matrix, the objective's $1/N$ contributes the factor $1/N$." }),
+  q({ number: 36, points: 2, title: "PCA properties", setup: PCA_SETUP, prompt: "Which of the following statements is true?", options: opts(["A", "PCA can be kernelized and the kernel matrix used is of size $d\\times d$."], ["B", "The first principal component minimizes the variance of the data projected onto it."], ["C", "The solution of PCA can be obtained through singular value decomposition of the empirical covariance of the data."], ["D", "Scaling all features of every datapoint by the same positive scalar does not change the principal components."]), correct: ["C"], topic: "Clustering & Dimensionality Reduction", difficulty: "Intermediate", explanation: "The covariance matrix is symmetric positive semidefinite, so its singular vectors recover the principal directions. A kernel PCA Gram matrix is $N\\times N$, and the first component maximizes—not minimizes—projected variance. (The exam treats 'principal components' as the resulting component values, which scale with the data.)" }),
+
+  q({ number: 37, points: 3, title: "Bernoulli MLE for zero", prompt: "Let $x_1,\\ldots,x_N$ be i.i.d. Bernoulli samples with parameter $\\theta$, where $\\theta$ is the probability of observing 1. What is the MLE for the probability of observing 0?", options: opts(["A", "$1/(1+\\exp(\\sum_nx_n))$"], ["B", "$\\frac1N\\sum_{n=1}^N(1-x_n)$"], ["C", "$1/(1+\\exp(-\\sum_nx_n))$"], ["D", "$\\frac1N\\sum_{n=1}^Nx_n$"]), correct: ["B"], topic: "Probabilistic Modeling", difficulty: "Intermediate", explanation: "$\\hat\\theta=\\frac1N\\sum_nx_n$ is the Bernoulli MLE for the probability of 1. Therefore the MLE for the probability of 0 is $1-\\hat\\theta=\\frac1N\\sum_n(1-x_n)$." }),
+  q({ number: 38, points: 3, title: "Beta-Bernoulli posterior", prompt: "A coin has unknown heads probability $\\theta\\sim\\operatorname{Beta}(1,1)$. We observe one head and one tail. What is the posterior after both observations?", options: opts(["A", "$\\operatorname{Beta}(3,1)$"], ["B", "$\\operatorname{Beta}(2,1)$"], ["C", "$\\operatorname{Beta}(1,2)$"], ["D", "$\\operatorname{Beta}(2,2)$"]), correct: ["D"], topic: "Probabilistic Modeling", difficulty: "Intermediate", explanation: "Beta-Bernoulli conjugacy adds the number of heads to $\\alpha$ and tails to $\\beta$, giving $\\operatorname{Beta}(1+1,1+1)=\\operatorname{Beta}(2,2)$." }),
+  q({ number: 39, points: 3, title: "Naive Bayes email classification", prompt: "A Naive Bayes spam classifier has $P(\\mathrm{spam})=P(\\mathrm{not\\ spam})=0.5$, $P(x_1=1\\mid\\mathrm{spam})=0.8$, $P(x_2=1\\mid\\mathrm{spam})=0.4$, $P(x_1=1\\mid\\mathrm{not\\ spam})=0.4$, and $P(x_2=1\\mid\\mathrm{not\\ spam})=0.9$. For a new email with $x_1=x_2=1$, which class has the larger posterior probability?", options: opts(["A", "Spam"], ["B", "Not spam"], ["C", "Both equal"], ["D", "Cannot be determined without the joint distribution"]), correct: ["B"], topic: "Probabilistic Modeling", difficulty: "Intermediate", explanation: "The unnormalized Naive Bayes scores are $0.5\\cdot0.8\\cdot0.4=0.16$ for spam and $0.5\\cdot0.4\\cdot0.9=0.18$ for not spam. Hence not spam has the larger posterior." }),
+  q({ number: 40, points: 4, title: "Laplace-mixture E-step", setup: EM_SETUP, prompt: "In the E-step, what is $p(z=1\\mid x;\\theta)$?", options: opts(["A", "$\\frac{1}{1+\\frac{qb_0}{(1-q)b_1}\\exp(\\frac{|x-\\mu_1|}{b_1}-\\frac{|x-\\mu_0|}{b_0})}$"], ["B", "$\\frac{1}{1+\\frac{(1-q)b_1}{qb_0}\\exp(\\frac{|x-\\mu_1|}{b_1}-\\frac{|x-\\mu_0|}{b_0})}$"], ["C", "$\\frac{1}{1+\\frac{qb_0}{(1-q)b_1}\\exp(\\frac{|x-\\mu_0|}{b_0}-\\frac{|x-\\mu_1|}{b_1})}$"], ["D", "$\\frac{1}{1+\\frac{(1-q)b_1}{qb_0}\\exp(\\frac{|x-\\mu_0|}{b_0}-\\frac{|x-\\mu_1|}{b_1})}$"]), correct: ["B"], topic: "Probabilistic Modeling", difficulty: "Advanced", explanation: "Bayes' rule gives $p(z=1\\mid x)=\\frac{q p(x\\mid1)}{q p(x\\mid1)+(1-q)p(x\\mid0)}$. Dividing numerator and denominator by the group-1 term yields option B." }),
+  q({ number: 41, points: 4, title: "Laplace-mixture mixing weight", setup: EM_SETUP, prompt: "In the M-step, what is the update for $q$?", options: opts(["A", "$q=\\frac1N\\sum_n\\gamma_0(x_n)$"], ["B", "$q=\\frac1N\\sum_n\\gamma_1(x_n)$"], ["C", "$q=\\frac{\\sum_n\\gamma_0(x_n)}{\\sum_n\\gamma_1(x_n)}$"], ["D", "$q=\\frac{\\sum_n\\gamma_1(x_n)}{\\sum_n\\gamma_0(x_n)}$"]), correct: ["B"], topic: "Probabilistic Modeling", difficulty: "Advanced", explanation: "The M-step mixture weight is the average responsibility of component 1: $q=\\frac1N\\sum_n\\gamma_1(x_n)$." }),
+  q({ number: 42, points: 4, title: "Laplace-mixture scale update", setup: EM_SETUP, prompt: "In the M-step, what is the update for the scale parameter $b_1$?", options: opts(["A", "$b_1=\\frac{\\sum_n\\gamma_1(x_n)|x_n-\\mu_1|}{\\sum_n\\gamma_0(x_n)}$"], ["B", "$b_1=\\frac{\\sum_n\\gamma_1(x_n)|x_n-\\mu_1|}{\\sum_n|x_n-\\mu_1|}$"], ["C", "$b_1=\\frac{\\sum_n\\gamma_1(x_n)|x_n-\\mu_1|}{\\sum_n\\gamma_1(x_n)}$"], ["D", "$b_1=\\frac{\\sum_n\\gamma_1(x_n)}{\\sum_n\\gamma_1(x_n)|x_n-\\mu_1|}$"]), correct: ["C"], topic: "Probabilistic Modeling", difficulty: "Advanced", explanation: "Maximizing the expected Laplace complete-data log-likelihood gives the responsibility-weighted mean absolute deviation from $\\mu_1$: $b_1=\\frac{\\sum_n\\gamma_1(x_n)|x_n-\\mu_1|}{\\sum_n\\gamma_1(x_n)}$." }),
 ];
 
-function normalizePrompt(prompt: string) {
-  return prompt
-    .replace(/\\\\/g, "")
-    .replace(/\s+/g, " ")
-    .replace(/[.$`]/g, "")
-    .trim()
-    .toLowerCase();
-}
-
-// The previously imported closed-form Lasso question is Question 6 in the
-// complete source file. Keep its stable id so existing local progress remains
-// attached to the same question, but correct its displayed exam metadata.
-const existingLassoClosedForm = questions.find((question) =>
-  normalizePrompt(question.prompt).includes("lasso solution")
-  && normalizePrompt(question.prompt).includes("closed form via matrix inversion")
-);
-if (existingLassoClosedForm) {
-  existingLassoClosedForm.number = 6;
-  existingLassoClosedForm.source = "HS25 · Question 6 · 2 points";
-}
-
-const knownIds = new Set(questions.map((question) => question.id));
-const knownPrompts = new Set(questions.map((question) => normalizePrompt(question.prompt)));
-
-for (const question of additionalQuestions) {
-  const normalized = normalizePrompt(question.prompt);
-  if (knownIds.has(question.id) || knownPrompts.has(normalized)) continue;
-  questions.push(question);
-  knownIds.add(question.id);
-  knownPrompts.add(normalized);
-}
+const nonHs25 = questions.filter((question) => question.examId !== EXAM_ID);
+questions.splice(0, questions.length, ...nonHs25, ...completeQuestions);
