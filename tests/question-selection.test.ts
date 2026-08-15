@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import "../data/hs25-additions";
 import { questions } from "../data/questions";
-import { answerProgress, setQuestionStatus } from "../lib/progress";
+import { applyQuestionEditWithCommonSetup, inferCommonSetupQuestionIds, removeQuestionEditFromCommonSetup } from "../lib/question-edits";
+import { answerProgress, applyEdits, setQuestionStatus } from "../lib/progress";
 import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
 import type { ProgressStore } from "../types/question";
 
@@ -57,6 +58,35 @@ test("an exam run contains every question from the selected exam in question-num
 
   assert.deepEqual(numbers, sortedNumbers);
   assert.equal(selected.length, questions.length);
+});
+
+test("common setups can be edited once and shared across a question group", () => {
+  const questionSeven = questions.find((question) => question.number === 7);
+  const questionEight = questions.find((question) => question.number === 8);
+  assert.ok(questionSeven);
+  assert.ok(questionEight);
+
+  assert.deepEqual(
+    inferCommonSetupQuestionIds(questionSeven, questions).sort(),
+    [questionSeven.id, questionEight.id].sort(),
+  );
+
+  const edits = applyQuestionEditWithCommonSetup(
+    {},
+    questionSeven.id,
+    { setup: "Updated shared kernel setup", prompt: "Only question 7 changes" },
+    [questionSeven.id, questionEight.id],
+  );
+
+  assert.equal(edits[questionSeven.id]?.setup, "Updated shared kernel setup");
+  assert.equal(edits[questionEight.id]?.setup, "Updated shared kernel setup");
+  assert.equal(edits[questionEight.id]?.prompt, undefined);
+  assert.deepEqual(edits[questionEight.id]?.commonSetupQuestionIds, [questionSeven.id, questionEight.id]);
+  assert.equal(applyEdits(questionEight, edits[questionEight.id]).setup, "Updated shared kernel setup");
+
+  const afterReset = removeQuestionEditFromCommonSetup(edits, questionSeven.id);
+  assert.equal(afterReset[questionSeven.id], undefined);
+  assert.equal(afterReset[questionEight.id]?.commonSetupQuestionIds, undefined);
 });
 
 test("incorrect answers enter Review and a correct review answer moves to Done", () => {
