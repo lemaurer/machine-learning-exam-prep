@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import "../data/hs25-additions";
 import { questions } from "../data/questions";
-import { isCorrectSelection } from "../lib/answers";
+import {
+  displayedAnswerLabel,
+  displayedOptionLabel,
+  isCorrectSelection,
+  optionIdForDisplayedKey,
+  shouldIgnoreAnswerShortcut,
+  shuffledOptionIds,
+} from "../lib/answers";
 import { applyQuestionEditWithCommonSetup, inferCommonSetupQuestionIds, inferFigureNumber, removeQuestionEditFromCommonSetup } from "../lib/question-edits";
 import { answerProgress, applyEdits, setQuestionStatus } from "../lib/progress";
 import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
@@ -76,6 +83,27 @@ test("diamond questions support exact multiple-answer selection", () => {
   assert.equal(isCorrectSelection(q27, ["A"]), false);
   assert.equal(isCorrectSelection(q33, ["B", "D"]), true);
   assert.equal(isCorrectSelection(q33, ["B", "D", "E"]), false);
+});
+
+test("displayed answer letters are randomized without changing answer correctness", () => {
+  const q2 = questions.find((question) => question.number === 2)!;
+  const originalIds = q2.options.map((option) => option.id);
+  const order = shuffledOptionIds(q2, () => 0);
+
+  assert.deepEqual(originalIds, ["A", "B", "C"]);
+  assert.deepEqual(order, ["B", "C", "A"]);
+  assert.deepEqual(q2.options.map((option) => option.id), originalIds, "shuffling must not mutate the source question");
+  assert.equal(optionIdForDisplayedKey("A", order), "B");
+  assert.equal(displayedOptionLabel("C", order), "B");
+  assert.equal(displayedAnswerLabel(["C"], order), "B");
+  assert.equal(isCorrectSelection(q2, ["C"]), true, "correctness must still use the underlying answer content");
+});
+
+test("Command, Control, and Alt shortcuts are never interpreted as answers", () => {
+  assert.equal(shouldIgnoreAnswerShortcut({ metaKey: true, ctrlKey: false, altKey: false }), true);
+  assert.equal(shouldIgnoreAnswerShortcut({ metaKey: false, ctrlKey: true, altKey: false }), true);
+  assert.equal(shouldIgnoreAnswerShortcut({ metaKey: false, ctrlKey: false, altKey: true }), true);
+  assert.equal(shouldIgnoreAnswerShortcut({ metaKey: false, ctrlKey: false, altKey: false }), false);
 });
 
 test("missing source figures are represented by numbered placeholders", () => {
