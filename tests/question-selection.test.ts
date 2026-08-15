@@ -12,7 +12,7 @@ import {
 } from "../lib/answers";
 import { applyQuestionEditWithCommonSetup, inferCommonSetupQuestionIds, inferFigureNumber, removeQuestionEditFromCommonSetup } from "../lib/question-edits";
 import { answerProgress, applyEdits, setQuestionStatus } from "../lib/progress";
-import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
+import { questionsAvailableForMode, questionsForExam, shuffleQuestionsBySetupGroup, uniqueQuestionsById } from "../lib/question-selection";
 import type { ProgressStore } from "../types/question";
 
 function normalizedPrompt(prompt: string) {
@@ -68,6 +68,19 @@ test("Practice receives new questions, Review receives review questions, and Exa
 test("exam mode always returns HS25 in original question-number order", () => {
   const selected = questionsForExam(questions, "HS25");
   assert.deepEqual(selected.map((question) => question.number), Array.from({ length: 42 }, (_, index) => index + 1));
+});
+
+test("practice shuffling keeps questions with the same setup adjacent and ordered", () => {
+  const sampleNumbers = [7, 8, 9, 10, 11, 12];
+  const sample = sampleNumbers.map((number) => questions.find((question) => question.number === number)!);
+  const grouped = shuffleQuestionsBySetupGroup(sample, () => 0);
+  const numbers = grouped.map((question) => question.number);
+
+  const seven = numbers.indexOf(7);
+  assert.deepEqual(numbers.slice(seven, seven + 2), [7, 8]);
+
+  const nine = numbers.indexOf(9);
+  assert.deepEqual(numbers.slice(nine, nine + 3), [9, 10, 11]);
 });
 
 test("diamond questions support exact multiple-answer selection", () => {
