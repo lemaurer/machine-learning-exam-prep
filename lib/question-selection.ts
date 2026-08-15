@@ -9,14 +9,20 @@ export function uniqueQuestionsById(questions: Question[]) {
   });
 }
 
+export function questionsForExam(questions: Question[], examId: string) {
+  return uniqueQuestionsById(questions)
+    .filter((question) => question.examId === examId)
+    .sort((left, right) => left.number - right.number);
+}
+
 export function questionsAvailableForMode(
   questions: Question[],
   progress: ProgressStore,
   mode: SessionMode,
 ) {
   return uniqueQuestionsById(questions).filter((question) => {
+    if (mode === "exam") return true;
     const status = progress[question.id]?.status ?? "new";
     return mode === "review" ? status === "review" : status === "new";
   });
 }
-
