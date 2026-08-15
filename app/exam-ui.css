@@ -21,6 +21,16 @@
   min-height: 72px;
 }
 
+/* Keep setup and question as separate blocks, but render both with the same
+   normal-weight Computer Modern / KaTeX typography. */
+.prompt {
+  font-weight: 400 !important;
+}
+
+.question-setup {
+  margin-bottom: 1.5em !important;
+}
+
 .exam-settings {
   border-top: 1px solid var(--line);
   margin-top: 24px;
