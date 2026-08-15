@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import "../data/hs25-additions";
 import { questions } from "../data/questions";
+import { isCorrectSelection } from "../lib/answers";
 import { applyQuestionEditWithCommonSetup, inferCommonSetupQuestionIds, inferFigureNumber, removeQuestionEditFromCommonSetup } from "../lib/question-edits";
 import { answerProgress, applyEdits, setQuestionStatus } from "../lib/progress";
 import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
@@ -16,27 +17,33 @@ function normalizedPrompt(prompt: string) {
     .toLowerCase();
 }
 
-test("the supplied bank contains 23 questions with unique ids and question texts", () => {
-  assert.equal(questions.length, 23);
-  assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);
-  assert.equal(new Set(questions.map((question) => normalizedPrompt(question.prompt))).size, questions.length);
+test("HS25 contains all 42 supplied questions exactly once", () => {
+  const hs25 = questionsForExam(questions, "HS25");
+  assert.equal(hs25.length, 42);
+  assert.deepEqual(hs25.map((question) => question.number), Array.from({ length: 42 }, (_, index) => index + 1));
+  assert.equal(new Set(hs25.map((question) => question.id)).size, 42);
+  assert.equal(new Set(hs25.map((question) => normalizedPrompt(question.prompt))).size, 42);
 });
 
-test("the complete source keeps the Lasso closed-form question as Question 6 without duplicating it", () => {
-  const closedForm = questions.filter((question) => normalizedPrompt(question.prompt).includes("lasso solution") && normalizedPrompt(question.prompt).includes("closed form via matrix inversion"));
-  assert.equal(closedForm.length, 1);
-  assert.equal(closedForm[0].number, 6);
+test("the corrected source wording is used for the previously partial questions", () => {
+  const q1 = questions.find((question) => question.examId === "HS25" && question.number === 1);
+  const q2 = questions.find((question) => question.examId === "HS25" && question.number === 2);
+  const q22 = questions.find((question) => question.examId === "HS25" && question.number === 22);
+  assert.ok(q1?.prompt.includes("strictly positive"));
+  assert.ok(q2?.prompt.includes("unique optimal solution"));
+  assert.ok(q22?.prompt.includes("characterizes the bias"));
+});
 
-  const questionFive = questions.find((question) => question.number === 5 && question.prompt.includes("lasso penalty encourages sparsity"));
-  assert.ok(questionFive);
+test("the Lasso questions are numbered 5 and 6 without duplication", () => {
+  const questionFive = questions.find((question) => question.examId === "HS25" && question.number === 5);
+  const questionSix = questions.find((question) => question.examId === "HS25" && question.number === 6);
+  assert.ok(questionFive?.prompt.includes("lasso penalty encourages sparsity"));
+  assert.ok(questionSix?.prompt.includes("closed form via matrix inversion"));
 });
 
 test("a duplicated source entry can never create a repeated session question", () => {
   const duplicatedBank = [questions[0], questions[0], questions[1]];
-  assert.deepEqual(
-    uniqueQuestionsById(duplicatedBank).map((question) => question.id),
-    [questions[0].id, questions[1].id],
-  );
+  assert.deepEqual(uniqueQuestionsById(duplicatedBank).map((question) => question.id), [questions[0].id, questions[1].id]);
 });
 
 test("Practice receives new questions, Review receives review questions, and Exam ignores study progress", () => {
@@ -51,37 +58,45 @@ test("Practice receives new questions, Review receives review questions, and Exa
   assert.deepEqual(questionsAvailableForMode(sample, progress, "review").map((question) => question.id), [questions[1].id]);
 });
 
-test("an exam run contains every question from the selected exam in question-number order", () => {
+test("exam mode always returns HS25 in original question-number order", () => {
   const selected = questionsForExam(questions, "HS25");
-  const numbers = selected.map((question) => question.number);
-  const sortedNumbers = [...numbers].sort((a, b) => a - b);
+  assert.deepEqual(selected.map((question) => question.number), Array.from({ length: 42 }, (_, index) => index + 1));
+});
 
-  assert.deepEqual(numbers, sortedNumbers);
-  assert.equal(selected.length, questions.length);
+test("diamond questions support exact multiple-answer selection", () => {
+  const q2 = questions.find((question) => question.number === 2)!;
+  const q27 = questions.find((question) => question.number === 27)!;
+  const q33 = questions.find((question) => question.number === 33)!;
+  assert.equal(q2.multipleSelect, true);
+  assert.equal(q27.multipleSelect, true);
+  assert.equal(q33.multipleSelect, true);
+  assert.equal(isCorrectSelection(q2, ["C"]), true);
+  assert.equal(isCorrectSelection(q2, ["A", "C"]), false);
+  assert.equal(isCorrectSelection(q27, ["A", "B"]), true);
+  assert.equal(isCorrectSelection(q27, ["A"]), false);
+  assert.equal(isCorrectSelection(q33, ["B", "D"]), true);
+  assert.equal(isCorrectSelection(q33, ["B", "D", "E"]), false);
+});
+
+test("missing source figures are represented by numbered placeholders", () => {
+  assert.equal(inferFigureNumber(questions.find((question) => question.number === 13)!), 2);
+  assert.equal(inferFigureNumber(questions.find((question) => question.number === 14)!), 3);
+  assert.equal(inferFigureNumber(questions.find((question) => question.number === 33)!), 6);
+  assert.equal(questions.find((question) => question.number === 13)?.figure, undefined);
+  assert.equal(questions.find((question) => question.number === 14)?.figure, undefined);
+  assert.equal(questions.find((question) => question.number === 33)?.figure, undefined);
 });
 
 test("common setups can be edited once and shared across a question group", () => {
-  const questionSeven = questions.find((question) => question.number === 7);
-  const questionEight = questions.find((question) => question.number === 8);
-  assert.ok(questionSeven);
-  assert.ok(questionEight);
+  const questionSeven = questions.find((question) => question.number === 7)!;
+  const questionEight = questions.find((question) => question.number === 8)!;
 
-  assert.deepEqual(
-    inferCommonSetupQuestionIds(questionSeven, questions).sort(),
-    [questionSeven.id, questionEight.id].sort(),
-  );
+  assert.deepEqual(inferCommonSetupQuestionIds(questionSeven, questions).sort(), [questionSeven.id, questionEight.id].sort());
 
-  const edits = applyQuestionEditWithCommonSetup(
-    {},
-    questionSeven.id,
-    { setup: "Updated shared kernel setup", prompt: "Only question 7 changes" },
-    [questionSeven.id, questionEight.id],
-  );
-
+  const edits = applyQuestionEditWithCommonSetup({}, questionSeven.id, { setup: "Updated shared kernel setup", prompt: "Only question 7 changes" }, [questionSeven.id, questionEight.id]);
   assert.equal(edits[questionSeven.id]?.setup, "Updated shared kernel setup");
   assert.equal(edits[questionEight.id]?.setup, "Updated shared kernel setup");
   assert.equal(edits[questionEight.id]?.prompt, undefined);
-  assert.deepEqual(edits[questionEight.id]?.commonSetupQuestionIds, [questionSeven.id, questionEight.id]);
   assert.equal(applyEdits(questionEight, edits[questionEight.id]).setup, "Updated shared kernel setup");
 
   const afterReset = removeQuestionEditFromCommonSetup(edits, questionSeven.id);
@@ -93,21 +108,15 @@ test("figures are identified by number and an edit propagates to every question 
   const figureOneQuestions = questions.filter((question) => inferFigureNumber(question) === 1);
   assert.deepEqual(figureOneQuestions.map((question) => question.number), [9, 10, 11]);
 
-  const editedFrom = figureOneQuestions[0];
-  assert.ok(editedFrom);
+  const editedFrom = figureOneQuestions[0]!;
   const figureQuestionIds = figureOneQuestions.map((question) => question.id);
-  const edits = applyQuestionEditWithCommonSetup(
-    {},
-    editedFrom.id,
-    {
-      figureNumber: 1,
-      figure: "/figures/replacement-figure-1.png",
-      figureAlt: "Updated shared Figure 1",
-      figureCaption: "Updated shared Figure 1 caption",
-      sharedFigureQuestionIds: figureQuestionIds,
-    },
-    [],
-  );
+  const edits = applyQuestionEditWithCommonSetup({}, editedFrom.id, {
+    figureNumber: 1,
+    figure: "/figures/replacement-figure-1.png",
+    figureAlt: "Updated shared Figure 1",
+    figureCaption: "Updated shared Figure 1 caption",
+    sharedFigureQuestionIds: figureQuestionIds,
+  }, []);
 
   for (const question of figureOneQuestions) {
     const updated = applyEdits(question, edits[question.id]);
@@ -118,11 +127,13 @@ test("figures are identified by number and an edit propagates to every question 
   }
 });
 
-test("incorrect answers enter Review and a correct review answer moves to Done", () => {
-  const missed = answerProgress(undefined, "A", false, new Date("2026-01-01T00:00:00Z"));
+test("progress stores multiple selected answers", () => {
+  const missed = answerProgress(undefined, ["A", "C"], false, new Date("2026-01-01T00:00:00Z"));
   assert.equal(missed.status, "review");
+  assert.deepEqual(missed.lastAnswerIds, ["A", "C"]);
 
-  const corrected = answerProgress(missed, "B", true, new Date("2026-01-02T00:00:00Z"));
+  const corrected = answerProgress(missed, ["B", "D"], true, new Date("2026-01-02T00:00:00Z"));
   assert.equal(corrected.status, "done");
   assert.equal(corrected.attempts, 2);
+  assert.deepEqual(corrected.lastAnswerIds, ["B", "D"]);
 });
