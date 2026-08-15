@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import "../data/hs25-additions";
 import { questions } from "../data/questions";
-import { applyQuestionEditWithCommonSetup, inferCommonSetupQuestionIds, removeQuestionEditFromCommonSetup } from "../lib/question-edits";
+import { applyQuestionEditWithCommonSetup, inferCommonSetupQuestionIds, inferFigureNumber, removeQuestionEditFromCommonSetup } from "../lib/question-edits";
 import { answerProgress, applyEdits, setQuestionStatus } from "../lib/progress";
 import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
 import type { ProgressStore } from "../types/question";
@@ -87,6 +87,35 @@ test("common setups can be edited once and shared across a question group", () =
   const afterReset = removeQuestionEditFromCommonSetup(edits, questionSeven.id);
   assert.equal(afterReset[questionSeven.id], undefined);
   assert.equal(afterReset[questionEight.id]?.commonSetupQuestionIds, undefined);
+});
+
+test("figures are identified by number and an edit propagates to every question using that figure", () => {
+  const figureOneQuestions = questions.filter((question) => inferFigureNumber(question) === 1);
+  assert.deepEqual(figureOneQuestions.map((question) => question.number), [9, 10, 11]);
+
+  const editedFrom = figureOneQuestions[0];
+  assert.ok(editedFrom);
+  const figureQuestionIds = figureOneQuestions.map((question) => question.id);
+  const edits = applyQuestionEditWithCommonSetup(
+    {},
+    editedFrom.id,
+    {
+      figureNumber: 1,
+      figure: "/figures/replacement-figure-1.png",
+      figureAlt: "Updated shared Figure 1",
+      figureCaption: "Updated shared Figure 1 caption",
+      sharedFigureQuestionIds: figureQuestionIds,
+    },
+    [],
+  );
+
+  for (const question of figureOneQuestions) {
+    const updated = applyEdits(question, edits[question.id]);
+    assert.equal(updated.figureNumber, 1);
+    assert.equal(updated.figure, "/figures/replacement-figure-1.png");
+    assert.equal(updated.figureAlt, "Updated shared Figure 1");
+    assert.equal(updated.figureCaption, "Updated shared Figure 1 caption");
+  }
 });
 
 test("incorrect answers enter Review and a correct review answer moves to Done", () => {
