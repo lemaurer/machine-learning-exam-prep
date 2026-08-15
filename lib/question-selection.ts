@@ -1,10 +1,18 @@
+import "../data/hs25-additions";
 import type { ProgressStore, Question, SessionMode } from "../types/question";
 
+function normalizedPrompt(prompt: string) {
+  return prompt.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 export function uniqueQuestionsById(questions: Question[]) {
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenPrompts = new Set<string>();
   return questions.filter((question) => {
-    if (seen.has(question.id)) return false;
-    seen.add(question.id);
+    const prompt = normalizedPrompt(question.prompt);
+    if (seenIds.has(question.id) || seenPrompts.has(prompt)) return false;
+    seenIds.add(question.id);
+    seenPrompts.add(prompt);
     return true;
   });
 }
