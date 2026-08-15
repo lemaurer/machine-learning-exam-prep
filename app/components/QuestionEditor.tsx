@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DIFFICULTIES, TOPICS, type Question, type QuestionEdit } from "../../types/question";
 import { LatexText } from "./LatexText";
 import { resolveAssetUrl } from "../../lib/assets";
+import { inferFigureNumber } from "../../lib/question-edits";
 
 function loadImageFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -72,6 +73,7 @@ export function QuestionEditor({
   const [draft, setDraft] = useState<Question>(question);
   const [commonSetupNumbers, setCommonSetupNumbers] = useState("");
   const [commonSetupError, setCommonSetupError] = useState("");
+  const [figureNumberText, setFigureNumberText] = useState("");
   const [figureError, setFigureError] = useState("");
   const [figureLoading, setFigureLoading] = useState(false);
 
@@ -86,6 +88,8 @@ export function QuestionEditor({
         .join(", "),
     );
     setCommonSetupError("");
+    setFigureNumberText(String(inferFigureNumber(question) ?? ""));
+    setFigureError("");
   }, [examQuestions, question, sharedSetupQuestionIds]);
 
   function save() {
@@ -106,6 +110,26 @@ export function QuestionEditor({
       ? [...new Set([question.id, ...numbers.map((number) => questionByNumber.get(number)!.id)])]
       : [];
 
+    const trimmedFigureNumber = figureNumberText.trim();
+    const figureNumber = trimmedFigureNumber ? Number(trimmedFigureNumber) : undefined;
+    if (trimmedFigureNumber && (!Number.isInteger(figureNumber) || Number(figureNumber) <= 0)) {
+      setFigureError("Figure number must be a positive whole number, such as 1 or 4.");
+      return;
+    }
+    if (draft.figure && !figureNumber) {
+      setFigureError("Every figure needs a figure number so it can be shared across all questions that use it.");
+      return;
+    }
+
+    const sharedFigureQuestionIds = figureNumber
+      ? [...new Set([
+          question.id,
+          ...examQuestions
+            .filter((candidate) => inferFigureNumber(candidate) === figureNumber)
+            .map((candidate) => candidate.id),
+        ])]
+      : [];
+
     onSave({
       setup: draft.setup,
       prompt: draft.prompt,
@@ -114,9 +138,11 @@ export function QuestionEditor({
       explanation: draft.explanation,
       topic: draft.topic,
       difficulty: draft.difficulty,
+      figureNumber,
       figure: draft.figure,
       figureAlt: draft.figureAlt,
       figureCaption: draft.figureCaption,
+      sharedFigureQuestionIds,
     }, commonSetupQuestionIds);
   }
 
@@ -174,14 +200,30 @@ export function QuestionEditor({
       <div className="editor-figure-section">
         <div className="editor-figure-heading">
           <strong>Figure</strong>
-          <small>Use a path from <code>/public</code>, such as <code>/figures/example.png</code>, or a full image URL.</small>
+          <small>Figures are shared by exam and figure number. Editing Figure 4 here updates Figure 4 everywhere it is used in {question.examId}.</small>
         </div>
+        <label className="editor-field">
+          <span>Figure number</span>
+          <input
+            inputMode="numeric"
+            value={figureNumberText}
+            placeholder="e.g. 4"
+            onChange={(event) => {
+              setFigureNumberText(event.target.value);
+              setFigureError("");
+            }}
+          />
+          <small>The number identifies the shared figure within this exam. Existing filenames such as <code>hs25_figure4.png</code> are recognized automatically.</small>
+        </label>
         <label className="editor-field">
           <span>Figure path or URL</span>
           <input
             value={draft.figure ?? ""}
             placeholder="/figures/filename.png"
-            onChange={(event) => setDraft({ ...draft, figure: event.target.value || undefined })}
+            onChange={(event) => {
+              setDraft({ ...draft, figure: event.target.value || undefined });
+              setFigureError("");
+            }}
           />
         </label>
         <label className="editor-file-button">
