@@ -1,7 +1,8 @@
 export const TOPICS = [
   "Kernels & Regression",
   "Neural Networks",
-  "Clustering",
+  "Optimization & Model Selection",
+  "Clustering & Dimensionality Reduction",
   "Probabilistic Modeling",
 ] as const;
 
@@ -27,6 +28,8 @@ export type Question = {
   prompt: string;
   options: QuestionOption[];
   correctOptionId: QuestionOption["id"];
+  correctOptionIds?: QuestionOption["id"][];
+  multipleSelect?: boolean;
   explanation: string;
   topic: Topic;
   difficulty: Difficulty;
@@ -43,6 +46,7 @@ export type QuestionProgress = {
   correct: number;
   incorrect: number;
   lastAnswerId: QuestionOption["id"];
+  lastAnswerIds?: QuestionOption["id"][];
   lastAnsweredAt: string;
 };
 
@@ -50,7 +54,7 @@ export type ProgressStore = Record<string, QuestionProgress>;
 export type QuestionEdit = Partial<
   Pick<
     Question,
-    "setup" | "prompt" | "options" | "correctOptionId" | "explanation" | "topic" | "difficulty" | "figureNumber" | "figure" | "figureAlt" | "figureCaption"
+    "setup" | "prompt" | "options" | "correctOptionId" | "correctOptionIds" | "multipleSelect" | "explanation" | "topic" | "difficulty" | "figureNumber" | "figure" | "figureAlt" | "figureCaption"
   >
 > & {
   commonSetupQuestionIds?: string[];
