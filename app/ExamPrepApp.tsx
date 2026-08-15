@@ -14,7 +14,7 @@ import {
   setQuestionStatus,
   shuffle,
 } from "../lib/progress";
-import { questionsAvailableForMode, uniqueQuestionsById } from "../lib/question-selection";
+import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
 import { resolveAssetUrl } from "../lib/assets";
 import {
   DIFFICULTIES,
@@ -35,7 +35,7 @@ type Screen = "setup" | "session" | "results";
 type SessionSize = "5" | "10" | "all";
 type SessionAnswer = {
   questionId: string;
-  selectedId: QuestionOption["id"];
+  selectedId: QuestionOption["id"] | null;
   correct: boolean;
 };
 
@@ -43,17 +43,17 @@ const MODE_COPY: Record<SessionMode, { eyebrow: string; title: string; body: str
   practice: {
     eyebrow: "Learn with feedback",
     title: "Practice the questions once, carefully.",
-    body: "Answer one supplied exam question at a time. Feedback and the provided solution appear immediately; answered questions leave this mode.",
+    body: "Answer one supplied exam question at a time. Feedback and the provided solution appear immediately; answered questions leave this mode. Skipped questions remain untouched for later.",
   },
   review: {
     eyebrow: "Return to weak spots",
     title: "Clear your review bin.",
-    body: "Incorrect answers and questions you save for later collect here. A question disappears from Review as soon as you answer it correctly.",
+    body: "Incorrect answers and questions you save for later collect here. A question disappears from Review as soon as you answer it correctly. Skipping leaves it in Review.",
   },
   exam: {
     eyebrow: "Work without hints",
-    title: "Simulate an exam run.",
-    body: "No feedback is shown while you answer. At the end, you receive a complete answer-by-answer review using the supplied solutions.",
+    title: "Simulate a complete exam run.",
+    body: "Choose one supplied exam and work through every question in its original order. No feedback is shown during the attempt, and your normal Done/Review progress is not changed.",
   },
 };
 
@@ -107,10 +107,12 @@ export function ExamPrepApp() {
     });
   }, [questions, examId, topic, difficulty, query]);
 
-  const availableQuestions = useMemo(
-    () => questionsAvailableForMode(filteredQuestions, progress, mode),
-    [filteredQuestions, mode, progress],
-  );
+  const availableQuestions = useMemo(() => {
+    if (mode === "exam") {
+      return examId === "all" ? [] : questionsForExam(questions, examId);
+    }
+    return questionsAvailableForMode(filteredQuestions, progress, mode);
+  }, [examId, filteredQuestions, mode, progress, questions]);
 
   const reviewQuestions = useMemo(
     () => questions.filter((question) => progress[question.id]?.status === "review"),
@@ -144,13 +146,16 @@ export function ExamPrepApp() {
 
   function switchMode(nextMode: SessionMode) {
     setMode(nextMode);
+    if (nextMode === "exam" && examId === "all" && EXAMS[0]) setExamId(EXAMS[0].id);
     setScreen("setup");
     setEditing(false);
   }
 
   function startSession() {
     const count = sessionSize === "all" ? availableQuestions.length : Number(sessionSize);
-    const selected = shuffle(availableQuestions).slice(0, count);
+    const selected = mode === "exam"
+      ? availableQuestions
+      : shuffle(availableQuestions).slice(0, count);
     if (!selected.length) return;
     setSessionIds(selected.map((question) => question.id));
     setQuestionIndex(0);
@@ -181,15 +186,21 @@ export function ExamPrepApp() {
     const correct = selectedId === currentQuestion.correctOptionId;
     const answer = { questionId: currentQuestion.id, selectedId, correct };
     setSessionAnswers((answers) => [...answers, answer]);
-    persistProgress((current) => ({
-      ...current,
-      [currentQuestion.id]: answerProgress(current[currentQuestion.id], selectedId, correct),
-    }));
     advance(true);
   }
 
-  function advance(fromExam = false) {
-    if (!fromExam && !feedbackVisible) return;
+  function skipQuestion() {
+    if (!currentQuestion || feedbackVisible) return;
+    setSessionAnswers((answers) => [...answers, {
+      questionId: currentQuestion.id,
+      selectedId: null,
+      correct: false,
+    }]);
+    advance(true);
+  }
+
+  function advance(force = false) {
+    if (!force && !feedbackVisible) return;
     if (questionIndex === sessionIds.length - 1) {
       setEditing(false);
       setScreen("results");
@@ -248,8 +259,8 @@ export function ExamPrepApp() {
 
   function endSession() {
     const wording = mode === "exam"
-      ? "End this exam attempt? Answers already locked in remain saved."
-      : "End this session? Answers already submitted remain saved.";
+      ? "End this exam attempt? The unfinished attempt will be discarded and study progress will remain unchanged."
+      : "End this session? Answers already submitted remain saved; skipped questions stay unchanged.";
     if (!window.confirm(wording)) return;
     setEditing(false);
     setScreen("setup");
@@ -270,6 +281,8 @@ export function ExamPrepApp() {
         chooseAnswer("A");
       } else if (!feedbackVisible && trueFalse && key === "F") {
         chooseAnswer("B");
+      } else if (!feedbackVisible && key === "S") {
+        skipQuestion();
       } else if (event.key === "Enter") {
         if (mode === "exam") commitExamAnswer();
         else advance();
@@ -335,6 +348,7 @@ export function ExamPrepApp() {
           status={progress[currentQuestion.id]?.status ?? "new"}
           onChoose={chooseAnswer}
           onNext={mode === "exam" ? commitExamAnswer : () => advance()}
+          onSkip={skipQuestion}
           onEdit={() => setEditing(true)}
           onEnd={endSession}
           onQueueReview={() => queueForReview(currentQuestion.id)}
@@ -411,7 +425,13 @@ function SetupScreen({
   onResetEdits: () => void;
 }) {
   const copy = MODE_COPY[mode];
-  const startCount = sessionSize === "all" ? availableQuestions.length : Math.min(Number(sessionSize), availableQuestions.length);
+  const startCount = mode === "exam"
+    ? availableQuestions.length
+    : sessionSize === "all"
+      ? availableQuestions.length
+      : Math.min(Number(sessionSize), availableQuestions.length);
+  const selectedExam = EXAMS.find((exam) => exam.id === examId);
+
   return (
     <div className="setup-layout">
       <section className="setup-main">
@@ -422,19 +442,32 @@ function SetupScreen({
         </div>
 
         <div className="setup-card">
-          <div className="filter-grid">
-            <label><span>Exam</span><select value={examId} onChange={(event) => setExamId(event.target.value)}><option value="all">All exams</option>{EXAMS.map((exam) => <option value={exam.id} key={exam.id}>{exam.label}</option>)}</select></label>
-            <label><span>Topic</span><select value={topic} onChange={(event) => setTopic(event.target.value as Topic | "all")}><option value="all">All topics</option>{TOPICS.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label><span>Difficulty</span><select value={difficulty} onChange={(event) => setDifficulty(event.target.value as Difficulty | "all")}><option value="all">All levels</option>{DIFFICULTIES.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label><span>Find a question</span><input className="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Number, title, or text" /></label>
-          </div>
-
-          <div className="length-row">
-            <div><span className="field-title">Session length</span><small>{availableQuestions.length} matching question{availableQuestions.length === 1 ? "" : "s"} available</small></div>
-            <div className="segmented" role="group" aria-label="Session length">
-              {(["5", "10", "all"] as SessionSize[]).map((size) => <button key={size} className={sessionSize === size ? "active" : ""} onClick={() => setSessionSize(size)}>{size === "all" ? "All" : size}</button>)}
+          {mode === "exam" ? (
+            <div className="filter-grid">
+              <label><span>Exam</span><select value={examId} onChange={(event) => setExamId(event.target.value)}>{EXAMS.map((exam) => <option value={exam.id} key={exam.id}>{exam.label}</option>)}</select></label>
             </div>
-          </div>
+          ) : (
+            <div className="filter-grid">
+              <label><span>Exam</span><select value={examId} onChange={(event) => setExamId(event.target.value)}><option value="all">All exams</option>{EXAMS.map((exam) => <option value={exam.id} key={exam.id}>{exam.label}</option>)}</select></label>
+              <label><span>Topic</span><select value={topic} onChange={(event) => setTopic(event.target.value as Topic | "all")}><option value="all">All topics</option>{TOPICS.map((item) => <option key={item}>{item}</option>)}</select></label>
+              <label><span>Difficulty</span><select value={difficulty} onChange={(event) => setDifficulty(event.target.value as Difficulty | "all")}><option value="all">All levels</option>{DIFFICULTIES.map((item) => <option key={item}>{item}</option>)}</select></label>
+              <label><span>Find a question</span><input className="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Number, title, or text" /></label>
+            </div>
+          )}
+
+          {mode === "exam" ? (
+            <div className="length-row">
+              <div><span className="field-title">Complete exam</span><small>{availableQuestions.length} question{availableQuestions.length === 1 ? "" : "s"} · original question-number order · progress unchanged</small></div>
+              <span className="local-pill">{selectedExam?.id ?? "Exam"}</span>
+            </div>
+          ) : (
+            <div className="length-row">
+              <div><span className="field-title">Session length</span><small>{availableQuestions.length} matching question{availableQuestions.length === 1 ? "" : "s"} available</small></div>
+              <div className="segmented" role="group" aria-label="Session length">
+                {(["5", "10", "all"] as SessionSize[]).map((size) => <button key={size} className={sessionSize === size ? "active" : ""} onClick={() => setSessionSize(size)}>{size === "all" ? "All" : size}</button>)}
+              </div>
+            </div>
+          )}
 
           {mode === "review" && (
             <div className="review-bin">
@@ -450,8 +483,8 @@ function SetupScreen({
           )}
 
           <div className="start-row">
-            <button className="primary-button" disabled={!availableQuestions.length} onClick={onStart}>{availableQuestions.length ? `${mode === "exam" ? "Begin exam" : mode === "review" ? "Start review" : "Start practice"} · ${startCount}` : mode === "review" ? "Review bin is clear" : "No unanswered questions"}<span>→</span></button>
-            <span className="shortcut-hint"><kbd>A</kbd>–<kbd>D</kbd> · True/False also <kbd>T</kbd>/<kbd>F</kbd></span>
+            <button className="primary-button" disabled={!availableQuestions.length} onClick={onStart}>{availableQuestions.length ? `${mode === "exam" ? "Begin exam" : mode === "review" ? "Start review" : "Start practice"} · ${startCount}` : mode === "review" ? "Review bin is clear" : mode === "exam" ? "No questions in this exam" : "No unanswered questions"}<span>→</span></button>
+            <span className="shortcut-hint"><kbd>A</kbd>–<kbd>D</kbd> · <kbd>S</kbd> skip · True/False also <kbd>T</kbd>/<kbd>F</kbd></span>
           </div>
         </div>
       </section>
@@ -464,7 +497,7 @@ function SetupScreen({
           <div><strong>{totals.review}</strong><span>in review</span></div>
           <div><strong>{totals.attempts ? `${totals.accuracy}%` : "—"}</strong><span>accuracy</span></div>
         </div>
-        <div className="source-note"><span>Question bank</span><strong>13 supplied questions · 1 exam</strong><p>Imported from the HS25 LaTeX solution file. No additional questions have been generated.</p></div>
+        <div className="source-note"><span>Question bank</span><strong>{sourceQuestions.length} supplied questions · {EXAMS.length} exam{EXAMS.length === 1 ? "" : "s"}</strong><p>Imported from the supplied exam material. No additional questions have been generated.</p></div>
         <div className="local-actions">
           <button className="text-button" onClick={onResetProgress}>Reset Done & Review progress</button>
           {editedCount > 0 && <button className="text-button" onClick={onResetEdits}>Restore {editedCount} local edit{editedCount === 1 ? "" : "s"}</button>}
@@ -484,6 +517,7 @@ function SessionScreen({
   status,
   onChoose,
   onNext,
+  onSkip,
   onEdit,
   onEnd,
   onQueueReview,
@@ -497,6 +531,7 @@ function SessionScreen({
   status: "new" | "done" | "review";
   onChoose: (id: QuestionOption["id"]) => void;
   onNext: () => void;
+  onSkip: () => void;
   onEdit: () => void;
   onEnd: () => void;
   onQueueReview: () => void;
@@ -506,7 +541,7 @@ function SessionScreen({
   return (
     <div className="session-page">
       <div className="session-toolbar">
-        <div><span className="mode-label">{mode} session</span><strong>Question {index + 1}<span> of {total}</span></strong></div>
+        <div><span className="mode-label">{mode === "exam" ? question.examLabel : `${mode} session`}</span><strong>Question {index + 1}<span> of {total}</span></strong></div>
         <div className="session-actions"><button className="text-button" onClick={onEdit}>Edit question</button><button className="text-button" onClick={onEnd}>End session</button></div>
       </div>
       <div className="progress-track"><span style={{ width: `${((index + (feedbackVisible ? 1 : 0)) / total) * 100}%` }} /></div>
@@ -528,7 +563,19 @@ function SessionScreen({
           })}
         </div>
 
-        {mode === "exam" && <div className="exam-commit"><span>{selectedId ? `Option ${selectedId} selected.` : "Choose an answer to continue."}</span><button className="primary-button compact" disabled={!selectedId} onClick={onNext}>{index + 1 === total ? "Finish exam" : "Lock answer & continue"}<span>→</span></button></div>}
+        {mode === "exam" && (
+          <div className="exam-commit">
+            <span>{selectedId ? `Option ${selectedId} selected. Lock it in, or skip this question.` : "Choose an answer, or skip this question."}</span>
+            <div className="session-actions">
+              <button className="secondary-button compact" onClick={onSkip}>Skip question</button>
+              <button className="primary-button compact" disabled={!selectedId} onClick={onNext}>{index + 1 === total ? "Finish exam" : "Lock answer & continue"}<span>→</span></button>
+            </div>
+          </div>
+        )}
+
+        {mode !== "exam" && !feedbackVisible && (
+          <div className="next-row"><div><span>Skip leaves this question and its progress exactly as it is.</span></div><button className="secondary-button compact" onClick={onSkip}>Skip question <span>→</span></button></div>
+        )}
 
         {feedbackVisible && <div className={`feedback ${isCorrect ? "correct" : "incorrect"}`} role="status"><div className="feedback-icon">{isCorrect ? "✓" : "×"}</div><div><strong>{isCorrect ? "Correct" : `Incorrect · Correct answer: ${question.correctOptionId}`}</strong><p><LatexText text={question.explanation} /></p><small>{question.source}</small></div></div>}
 
@@ -558,31 +605,42 @@ function ResultsScreen({
   onOpenReview: () => void;
 }) {
   const score = answers.filter((answer) => answer.correct).length;
+  const skipped = answers.filter((answer) => answer.selectedId === null).length;
+  const incorrectAnswered = answers.filter((answer) => answer.selectedId !== null && !answer.correct).length;
   const percentage = answers.length ? Math.round((score / answers.length) * 100) : 0;
+  const resultCopy = mode === "exam"
+    ? `${answers.length - score} question${answers.length - score === 1 ? " was" : "s were"} incorrect or skipped. Exam mode did not change your Done/Review progress.`
+    : skipped
+      ? `${skipped} skipped question${skipped === 1 ? " was" : "s were"} left unchanged.${incorrectAnswered ? ` ${incorrectAnswered} incorrect answer${incorrectAnswered === 1 ? " was" : "s were"} saved in Review.` : ""}`
+      : incorrectAnswered
+        ? `${incorrectAnswered} question${incorrectAnswered === 1 ? " was" : "s were"} saved in Review.`
+        : "Every answered question was correct.";
+
   return (
     <div className="results-page">
       <section className="result-hero">
         <span className="eyebrow">{mode === "exam" ? "Exam complete" : "Session complete"}</span>
         <div className="score-ring" style={{ "--score": `${percentage * 3.6}deg` } as React.CSSProperties}><div><strong>{percentage}%</strong><span>{score} / {answers.length} correct</span></div></div>
         <h1>{percentage === 100 ? "Complete precision." : percentage >= 70 ? "A strong pass." : "Useful diagnosis."}</h1>
-        <p>{answers.length - score ? `${answers.length - score} question${answers.length - score === 1 ? "" : "s"} saved in Review.` : "Every answer was correct."}</p>
-        <div className="result-actions"><button className="primary-button" onClick={onReturn}>Back to setup <span>→</span></button>{answers.length - score > 0 && <button className="secondary-button" onClick={onOpenReview}>Open Review</button>}</div>
+        <p>{resultCopy}</p>
+        <div className="result-actions"><button className="primary-button" onClick={onReturn}>Back to setup <span>→</span></button>{mode !== "exam" && incorrectAnswered > 0 && <button className="secondary-button" onClick={onOpenReview}>Open Review</button>}</div>
       </section>
 
       <section className="answer-review">
-        <div className="answer-review-heading"><div><span className="eyebrow">Complete answer review</span><h2>Every question and solution</h2></div><span>{answers.length} answers</span></div>
+        <div className="answer-review-heading"><div><span className="eyebrow">Complete answer review</span><h2>Every question and solution</h2></div><span>{answers.length} questions · {skipped} skipped</span></div>
         <div className="answer-list">
           {answers.map((answer, index) => {
             const question = questions.find((item) => item.id === answer.questionId);
             if (!question) return null;
-            const selected = question.options.find((option) => option.id === answer.selectedId);
+            const selected = answer.selectedId ? question.options.find((option) => option.id === answer.selectedId) : undefined;
             const correct = question.options.find((option) => option.id === question.correctOptionId);
             const isReview = progress[question.id]?.status === "review";
+            const wasSkipped = answer.selectedId === null;
             return <details key={question.id} className={`answer-item ${answer.correct ? "correct" : "incorrect"}`} open={mode === "exam" || !answer.correct}>
-              <summary><span className="result-index">{String(index + 1).padStart(2, "0")}</span><span className="result-mark">{answer.correct ? "✓" : "×"}</span><span className="result-question"><small>{question.examId} · Question {question.number} · {question.topic}</small><LatexText text={question.prompt} /></span><span className="result-answer">{answer.selectedId} / {question.correctOptionId}</span></summary>
+              <summary><span className="result-index">{String(index + 1).padStart(2, "0")}</span><span className="result-mark">{wasSkipped ? "—" : answer.correct ? "✓" : "×"}</span><span className="result-question"><small>{question.examId} · Question {question.number} · {question.topic}</small><LatexText text={question.prompt} /></span><span className="result-answer">{wasSkipped ? `Skipped / ${question.correctOptionId}` : `${answer.selectedId} / ${question.correctOptionId}`}</span></summary>
               <div className="answer-detail">
                 {question.setup && <div className="answer-setup"><LatexText text={question.setup} /></div>}
-                <p><strong>Your answer:</strong> {answer.selectedId}. <LatexText text={selected?.text ?? ""} /></p>
+                {wasSkipped ? <p><strong>Your answer:</strong> Skipped.</p> : <p><strong>Your answer:</strong> {answer.selectedId}. <LatexText text={selected?.text ?? ""} /></p>}
                 <p><strong>Correct answer:</strong> {question.correctOptionId}. <LatexText text={correct?.text ?? ""} /></p>
                 <div className="solution-copy"><LatexText text={question.explanation} /></div>
                 <div className="review-toggle">{isReview ? <><span>In Review</span><button className="text-button" onClick={() => onDone(question.id)}>Move to Done</button></> : <button className="secondary-button compact" onClick={() => onQueueReview(question.id)}>Save to Review</button>}</div>
