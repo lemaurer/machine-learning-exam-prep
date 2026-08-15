@@ -12,7 +12,6 @@ import {
   saveEdits,
   saveProgress,
   setQuestionStatus,
-  shuffle,
 } from "../lib/progress";
 import {
   applyQuestionEditWithCommonSetup,
@@ -30,7 +29,12 @@ import {
   shuffledOptionIds,
   type OptionId,
 } from "../lib/answers";
-import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
+import {
+  questionsAvailableForMode,
+  questionsForExam,
+  shuffleQuestionsBySetupGroup,
+  uniqueQuestionsById,
+} from "../lib/question-selection";
 import { resolveAssetUrl } from "../lib/assets";
 import {
   DIFFICULTIES,
@@ -68,23 +72,10 @@ const DEFAULT_EXAM_SETTINGS: ExamSettings = {
   showFinalReview: true,
   showProgressBar: true,
 };
-
-const MODE_COPY: Record<SessionMode, { eyebrow: string; title: string; body: string }> = {
-  practice: {
-    eyebrow: "Learn with feedback",
-    title: "Practice the questions once, carefully.",
-    body: "Answer one supplied exam question at a time. Feedback and the provided solution appear immediately; answered questions leave this mode. Skipped questions remain untouched for later.",
-  },
-  review: {
-    eyebrow: "Return to weak spots",
-    title: "Clear your review bin.",
-    body: "Incorrect answers and questions you save for later collect here. A question disappears from Review as soon as you answer it correctly. Skipping leaves it in Review.",
-  },
-  exam: {
-    eyebrow: "Work through a complete paper",
-    title: "Configure your exam run.",
-    body: "Choose one supplied exam and work through every question in its original order. You can keep strict exam conditions or turn on feedback after each question. Done/Review progress is not changed during the attempt.",
-  },
+const MODE_TITLE: Record<SessionMode, string> = {
+  practice: "Practice",
+  review: "Review",
+  exam: "Exam",
 };
 
 function loadExamSettings(): ExamSettings {
@@ -101,7 +92,7 @@ export function ExamPrepApp() {
   const [screen, setScreen] = useState<Screen>("setup");
   const [mode, setMode] = useState<SessionMode>("practice");
   const [examId, setExamId] = useState("all");
-  const [topic, setTopic] = useState<Topic | "all">("all");
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [difficulty, setDifficulty] = useState<Difficulty | "all">("all");
   const [query, setQuery] = useState("");
   const [sessionSize, setSessionSize] = useState<SessionSize>("5");
@@ -148,11 +139,11 @@ export function ExamPrepApp() {
         question.topic,
       ].some((value) => value.toLowerCase().includes(needle));
       return (examId === "all" || question.examId === examId)
-        && (topic === "all" || question.topic === topic)
+        && (!topics.length || topics.includes(question.topic))
         && (difficulty === "all" || question.difficulty === difficulty)
         && matchesQuery;
     });
-  }, [questions, examId, topic, difficulty, query]);
+  }, [questions, examId, topics, difficulty, query]);
 
   const availableQuestions = useMemo(() => {
     if (mode === "exam") return examId === "all" ? [] : questionsForExam(questions, examId);
@@ -198,7 +189,9 @@ export function ExamPrepApp() {
 
   function startSession() {
     const count = sessionSize === "all" ? availableQuestions.length : Number(sessionSize);
-    const selected = mode === "exam" ? availableQuestions : shuffle(availableQuestions).slice(0, count);
+    const selected = mode === "exam"
+      ? availableQuestions
+      : shuffleQuestionsBySetupGroup(availableQuestions).slice(0, count);
     if (!selected.length) return;
     setSessionIds(selected.map((question) => question.id));
     setQuestionIndex(0);
@@ -391,19 +384,19 @@ export function ExamPrepApp() {
         <SetupScreen
           mode={mode}
           examId={examId}
-          topic={topic}
+          topics={topics}
           difficulty={difficulty}
           query={query}
           sessionSize={sessionSize}
           examSettings={examSettings}
           setExamId={setExamId}
-          setTopic={setTopic}
+          setTopics={setTopics}
           setDifficulty={setDifficulty}
           setQuery={setQuery}
           setSessionSize={setSessionSize}
           setExamSettings={setExamSettings}
           availableQuestions={availableQuestions}
-          reviewQuestions={reviewQuestions}
+          reviewQuestions={mode === "review" ? availableQuestions : reviewQuestions}
           totals={totals}
           editedCount={Object.keys(edits).length}
           onStart={startSession}
@@ -466,13 +459,13 @@ export function ExamPrepApp() {
 function SetupScreen({
   mode,
   examId,
-  topic,
+  topics,
   difficulty,
   query,
   sessionSize,
   examSettings,
   setExamId,
-  setTopic,
+  setTopics,
   setDifficulty,
   setQuery,
   setSessionSize,
@@ -488,13 +481,13 @@ function SetupScreen({
 }: {
   mode: SessionMode;
   examId: string;
-  topic: Topic | "all";
+  topics: Topic[];
   difficulty: Difficulty | "all";
   query: string;
   sessionSize: SessionSize;
   examSettings: ExamSettings;
   setExamId: (value: string) => void;
-  setTopic: (value: Topic | "all") => void;
+  setTopics: (value: Topic[]) => void;
   setDifficulty: (value: Difficulty | "all") => void;
   setQuery: (value: string) => void;
   setSessionSize: (value: SessionSize) => void;
@@ -508,7 +501,6 @@ function SetupScreen({
   onResetProgress: () => void;
   onResetEdits: () => void;
 }) {
-  const copy = MODE_COPY[mode];
   const startCount = mode === "exam"
     ? availableQuestions.length
     : sessionSize === "all"
@@ -518,57 +510,60 @@ function SetupScreen({
   const updateExamSetting = <K extends keyof ExamSettings>(key: K, value: ExamSettings[K]) => {
     setExamSettings({ ...examSettings, [key]: value });
   };
+  const toggleTopic = (topic: Topic) => {
+    setTopics(topics.includes(topic) ? topics.filter((item) => item !== topic) : [...topics, topic]);
+  };
 
   return (
-    <div className="setup-layout">
+    <div className="setup-layout compact-setup-layout">
       <section className="setup-main">
-        <div className="hero-copy">
-          <span className="eyebrow">{copy.eyebrow}</span>
-          <h1>{copy.title}</h1>
-          <p>{copy.body}</p>
+        <div className="compact-hero">
+          <h1>{MODE_TITLE[mode]}</h1>
+          <span>{availableQuestions.length} available</span>
         </div>
 
-        <div className="setup-card">
+        <div className="setup-card compact-setup-card">
           {mode === "exam" ? (
-            <div className="filter-grid">
+            <div className="filter-grid compact-filters exam-filter-row">
               <label><span>Exam</span><select value={examId} onChange={(event) => setExamId(event.target.value)}>{EXAMS.map((exam) => <option value={exam.id} key={exam.id}>{exam.label}</option>)}</select></label>
             </div>
           ) : (
-            <div className="filter-grid">
-              <label><span>Exam</span><select value={examId} onChange={(event) => setExamId(event.target.value)}><option value="all">All exams</option>{EXAMS.map((exam) => <option value={exam.id} key={exam.id}>{exam.label}</option>)}</select></label>
-              <label><span>Topic</span><select value={topic} onChange={(event) => setTopic(event.target.value as Topic | "all")}><option value="all">All topics</option>{TOPICS.map((item) => <option key={item}>{item}</option>)}</select></label>
-              <label><span>Difficulty</span><select value={difficulty} onChange={(event) => setDifficulty(event.target.value as Difficulty | "all")}><option value="all">All levels</option>{DIFFICULTIES.map((item) => <option key={item}>{item}</option>)}</select></label>
-              <label><span>Find a question</span><input className="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Number, title, or text" /></label>
-            </div>
+            <>
+              <div className="filter-grid compact-filters">
+                <label><span>Exam</span><select value={examId} onChange={(event) => setExamId(event.target.value)}><option value="all">All exams</option>{EXAMS.map((exam) => <option value={exam.id} key={exam.id}>{exam.label}</option>)}</select></label>
+                <label><span>Difficulty</span><select value={difficulty} onChange={(event) => setDifficulty(event.target.value as Difficulty | "all")}><option value="all">All levels</option>{DIFFICULTIES.map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label><span>Search</span><input className="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Number, title, text" /></label>
+              </div>
+              <div className="topic-filter">
+                <span className="field-title">Topics</span>
+                <div className="topic-chips" role="group" aria-label="Filter by topics">
+                  <button className={!topics.length ? "active" : ""} onClick={() => setTopics([])} aria-pressed={!topics.length}>All</button>
+                  {TOPICS.map((item) => (
+                    <button key={item} className={topics.includes(item) ? "active" : ""} onClick={() => toggleTopic(item)} aria-pressed={topics.includes(item)}>{item}</button>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
 
           {mode === "exam" ? (
             <>
-              <div className="length-row">
-                <div><span className="field-title">Complete exam</span><small>{availableQuestions.length} question{availableQuestions.length === 1 ? "" : "s"} · original question-number order · study progress unchanged</small></div>
+              <div className="length-row compact-length-row">
+                <div><span className="field-title">Complete exam</span><small>{availableQuestions.length} questions · ordered by question number</small></div>
                 <span className="local-pill">{selectedExam?.id ?? "Exam"}</span>
               </div>
-              <div className="exam-settings">
-                <div className="exam-settings-heading"><strong>Exam settings</strong><small>Remembered for your next attempt</small></div>
+              <div className="exam-settings compact-exam-settings">
+                <div className="exam-settings-heading"><strong>Options</strong></div>
                 <div className="exam-settings-grid">
-                  <label className="exam-setting">
-                    <input type="checkbox" checked={examSettings.feedbackAfterEach} onChange={(event) => updateExamSetting("feedbackAfterEach", event.target.checked)} />
-                    <span><strong>Feedback after each question</strong><small>Show correctness and the explanation immediately after locking an answer.</small></span>
-                  </label>
-                  <label className="exam-setting">
-                    <input type="checkbox" checked={examSettings.showFinalReview} onChange={(event) => updateExamSetting("showFinalReview", event.target.checked)} />
-                    <span><strong>Full review at the end</strong><small>Show every selected answer, correct answer, and solution after the score.</small></span>
-                  </label>
-                  <label className="exam-setting">
-                    <input type="checkbox" checked={examSettings.showProgressBar} onChange={(event) => updateExamSetting("showProgressBar", event.target.checked)} />
-                    <span><strong>Show progress bar</strong><small>Keep the horizontal progress indicator visible during the exam.</small></span>
-                  </label>
+                  <label className="exam-setting"><input type="checkbox" checked={examSettings.feedbackAfterEach} onChange={(event) => updateExamSetting("feedbackAfterEach", event.target.checked)} /><span><strong>Feedback after each</strong></span></label>
+                  <label className="exam-setting"><input type="checkbox" checked={examSettings.showFinalReview} onChange={(event) => updateExamSetting("showFinalReview", event.target.checked)} /><span><strong>Final review</strong></span></label>
+                  <label className="exam-setting"><input type="checkbox" checked={examSettings.showProgressBar} onChange={(event) => updateExamSetting("showProgressBar", event.target.checked)} /><span><strong>Progress bar</strong></span></label>
                 </div>
               </div>
             </>
           ) : (
-            <div className="length-row">
-              <div><span className="field-title">Session length</span><small>{availableQuestions.length} matching question{availableQuestions.length === 1 ? "" : "s"} available</small></div>
+            <div className="length-row compact-length-row">
+              <div><span className="field-title">Session</span><small>{availableQuestions.length} matching</small></div>
               <div className="segmented" role="group" aria-label="Session length">
                 {(["5", "10", "all"] as SessionSize[]).map((size) => <button key={size} className={sessionSize === size ? "active" : ""} onClick={() => setSessionSize(size)}>{size === "all" ? "All" : size}</button>)}
               </div>
@@ -576,36 +571,35 @@ function SetupScreen({
           )}
 
           {mode === "review" && (
-            <div className="review-bin">
-              <div className="review-heading"><strong>Review bin</strong><span>{reviewQuestions.length} saved</span></div>
+            <div className="review-bin compact-review-bin">
+              <div className="review-heading"><strong>Review bin</strong><span>{reviewQuestions.length} matching</span></div>
               {reviewQuestions.length ? reviewQuestions.map((question) => (
                 <div className="review-row" key={question.id}>
                   <span className="status-dot" />
-                  <div><small>{question.examId} · Question {question.number}</small><p><LatexText text={question.prompt} /></p></div>
-                  <button className="text-button" onClick={() => onMarkDone(question.id)}>Move to Done</button>
+                  <div><small>{question.examId} · Q{question.number}</small><p><LatexText text={question.prompt} /></p></div>
+                  <button className="text-button" onClick={() => onMarkDone(question.id)}>Done</button>
                 </div>
-              )) : <div className="empty-state"><span>✓</span><div><strong>Your review bin is clear.</strong><p>Missed or manually saved questions will appear here.</p></div></div>}
+              )) : <div className="empty-state compact-empty"><strong>Review is clear.</strong></div>}
             </div>
           )}
 
-          <div className="start-row">
-            <button className="primary-button" disabled={!availableQuestions.length} onClick={onStart}>{availableQuestions.length ? `${mode === "exam" ? "Begin exam" : mode === "review" ? "Start review" : "Start practice"} · ${startCount}` : mode === "review" ? "Review bin is clear" : mode === "exam" ? "No questions in this exam" : "No unanswered questions"}<span>→</span></button>
-            <span className="shortcut-hint"><kbd>A</kbd>–<kbd>F</kbd> · <kbd>S</kbd> skip · <kbd>Enter</kbd> submit/continue · answers reshuffle each time</span>
+          <div className="start-row compact-start-row">
+            <button className="primary-button" disabled={!availableQuestions.length} onClick={onStart}>{availableQuestions.length ? `${mode === "exam" ? "Begin exam" : mode === "review" ? "Start review" : "Start practice"} · ${startCount}` : mode === "review" ? "Review is clear" : "No matching questions"}<span>→</span></button>
           </div>
         </div>
       </section>
 
-      <aside className="stats-panel">
-        <div className="stats-heading"><span className="eyebrow">Study progress</span><span className="local-pill">Autosaved</span></div>
-        <div className="stat-grid">
+      <aside className="stats-panel compact-stats-panel">
+        <div className="stats-heading"><span className="eyebrow">Progress</span><span className="local-pill">Autosaved</span></div>
+        <div className="stat-grid compact-stat-grid">
           <div><strong>{totals.newCount}</strong><span>new</span></div>
           <div><strong>{totals.done}</strong><span>done</span></div>
-          <div><strong>{totals.review}</strong><span>in review</span></div>
+          <div><strong>{totals.review}</strong><span>review</span></div>
           <div><strong>{totals.attempts ? `${totals.accuracy}%` : "—"}</strong><span>accuracy</span></div>
         </div>
-        <div className="source-note"><span>Question bank</span><strong>{sourceQuestions.length} supplied questions · {EXAMS.length} exam{EXAMS.length === 1 ? "" : "s"}</strong><p>Imported from the supplied exam material. No additional questions have been generated.</p></div>
-        <div className="local-actions">
-          <button className="text-button" onClick={onResetProgress}>Reset Done & Review progress</button>
+        <div className="bank-summary">{sourceQuestions.length} questions · {EXAMS.length} exam{EXAMS.length === 1 ? "" : "s"}</div>
+        <div className="local-actions compact-local-actions">
+          <button className="text-button" onClick={onResetProgress}>Reset progress</button>
           {editedCount > 0 && <button className="text-button" onClick={onResetEdits}>Restore {editedCount} edit{editedCount === 1 ? "" : "s"}</button>}
         </div>
       </aside>
