@@ -150,7 +150,7 @@ export function QuestionEditor({
     <aside className="editor-panel" aria-label="Question editor">
       <div className="editor-heading">
         <div>
-          <span className="eyebrow">Local question edit</span>
+          <span className="eyebrow">Question edit</span>
           <h2>Question {question.number}</h2>
         </div>
         <button className="icon-button" onClick={onClose} aria-label="Close editor">×</button>
@@ -323,7 +323,7 @@ export function QuestionEditor({
 
       <div className="editor-actions">
         {hasLocalEdit && <button className="text-button danger" onClick={onReset}>Restore supplied version</button>}
-        <button className="primary-button compact" onClick={save}>Save locally</button>
+        <button className="primary-button compact" onClick={save}>Save changes</button>
       </div>
     </aside>
   );
