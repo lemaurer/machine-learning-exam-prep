@@ -5,6 +5,10 @@ function normalizedPrompt(prompt: string) {
   return prompt.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+function normalizedSetup(setup?: string) {
+  return setup?.replace(/\s+/g, " ").trim().toLowerCase() ?? "";
+}
+
 export function uniqueQuestionsById(questions: Question[]) {
   const seenIds = new Set<string>();
   const seenPrompts = new Set<string>();
@@ -33,4 +37,30 @@ export function questionsAvailableForMode(
     const status = progress[question.id]?.status ?? "new";
     return mode === "review" ? status === "review" : status === "new";
   });
+}
+
+export function shuffleQuestionsBySetupGroup(
+  questions: Question[],
+  random: () => number = Math.random,
+) {
+  const groups = new Map<string, Question[]>();
+
+  for (const question of uniqueQuestionsById(questions)) {
+    const setup = normalizedSetup(question.setup);
+    const key = setup ? `${question.examId}::${setup}` : `question::${question.id}`;
+    const group = groups.get(key) ?? [];
+    group.push(question);
+    groups.set(key, group);
+  }
+
+  const shuffledGroups = [...groups.values()].map((group) =>
+    [...group].sort((left, right) => left.number - right.number),
+  );
+
+  for (let index = shuffledGroups.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [shuffledGroups[index], shuffledGroups[swapIndex]] = [shuffledGroups[swapIndex], shuffledGroups[index]];
+  }
+
+  return shuffledGroups.flat();
 }
