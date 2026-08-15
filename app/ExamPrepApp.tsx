@@ -19,7 +19,17 @@ import {
   inferCommonSetupQuestionIds,
   removeQuestionEditFromCommonSetup,
 } from "../lib/question-edits";
-import { answerLabel, correctOptionIds, isCorrectSelection, type OptionId } from "../lib/answers";
+import {
+  DISPLAY_OPTION_IDS,
+  correctOptionIds,
+  displayedAnswerLabel,
+  displayedOptionLabel,
+  isCorrectSelection,
+  optionIdForDisplayedKey,
+  shouldIgnoreAnswerShortcut,
+  shuffledOptionIds,
+  type OptionId,
+} from "../lib/answers";
 import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
 import { resolveAssetUrl } from "../lib/assets";
 import {
@@ -43,6 +53,7 @@ type SessionSize = "5" | "10" | "all";
 type SessionAnswer = {
   questionId: string;
   selectedIds: OptionId[];
+  optionOrder: OptionId[];
   correct: boolean;
 };
 type ExamSettings = {
@@ -100,6 +111,7 @@ export function ExamPrepApp() {
   const [sessionIds, setSessionIds] = useState<string[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedIds, setSelectedIds] = useState<OptionId[]>([]);
+  const [displayedOptionIds, setDisplayedOptionIds] = useState<OptionId[]>([]);
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [sessionAnswers, setSessionAnswers] = useState<SessionAnswer[]>([]);
   const [editing, setEditing] = useState(false);
@@ -191,6 +203,7 @@ export function ExamPrepApp() {
     setSessionIds(selected.map((question) => question.id));
     setQuestionIndex(0);
     setSelectedIds([]);
+    setDisplayedOptionIds(shuffledOptionIds(selected[0]));
     setFeedbackVisible(false);
     setSessionAnswers([]);
     setEditing(false);
@@ -200,7 +213,12 @@ export function ExamPrepApp() {
   function submitPracticeAnswer(answerIds = selectedIds) {
     if (!currentQuestion || feedbackVisible || !answerIds.length) return;
     const correct = isCorrectSelection(currentQuestion, answerIds);
-    setSessionAnswers((answers) => [...answers, { questionId: currentQuestion.id, selectedIds: answerIds, correct }]);
+    setSessionAnswers((answers) => [...answers, {
+      questionId: currentQuestion.id,
+      selectedIds: [...answerIds],
+      optionOrder: [...displayedOptionIds],
+      correct,
+    }]);
     persistProgress((current) => ({
       ...current,
       [currentQuestion.id]: answerProgress(current[currentQuestion.id], answerIds, correct),
@@ -225,7 +243,12 @@ export function ExamPrepApp() {
   function commitExamAnswer() {
     if (!currentQuestion || feedbackVisible || !selectedIds.length) return;
     const correct = isCorrectSelection(currentQuestion, selectedIds);
-    setSessionAnswers((answers) => [...answers, { questionId: currentQuestion.id, selectedIds: [...selectedIds], correct }]);
+    setSessionAnswers((answers) => [...answers, {
+      questionId: currentQuestion.id,
+      selectedIds: [...selectedIds],
+      optionOrder: [...displayedOptionIds],
+      correct,
+    }]);
     if (examSettings.feedbackAfterEach) {
       setFeedbackVisible(true);
       return;
@@ -235,7 +258,12 @@ export function ExamPrepApp() {
 
   function skipQuestion() {
     if (!currentQuestion || feedbackVisible) return;
-    setSessionAnswers((answers) => [...answers, { questionId: currentQuestion.id, selectedIds: [], correct: false }]);
+    setSessionAnswers((answers) => [...answers, {
+      questionId: currentQuestion.id,
+      selectedIds: [],
+      optionOrder: [...displayedOptionIds],
+      correct: false,
+    }]);
     advance(true);
   }
 
@@ -246,8 +274,11 @@ export function ExamPrepApp() {
       setScreen("results");
       return;
     }
-    setQuestionIndex((index) => index + 1);
+    const nextIndex = questionIndex + 1;
+    const nextQuestion = questions.find((question) => question.id === sessionIds[nextIndex]);
+    setQuestionIndex(nextIndex);
     setSelectedIds([]);
+    setDisplayedOptionIds(nextQuestion ? shuffledOptionIds(nextQuestion) : []);
     setFeedbackVisible(false);
     setEditing(false);
   }
@@ -304,17 +335,21 @@ export function ExamPrepApp() {
       if (screen !== "session" || editing || !currentQuestion) return;
       const target = event.target as HTMLElement;
       if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
-      const key = event.key.toUpperCase();
-      const trueFalse = currentQuestion.options.length === 2
-        && currentQuestion.options[0]?.text.toLowerCase() === "true"
-        && currentQuestion.options[1]?.text.toLowerCase() === "false";
+      if (shouldIgnoreAnswerShortcut(event)) return;
 
-      if (!feedbackVisible && /^[A-F]$/.test(key) && currentQuestion.options.some((option) => option.id === key)) {
-        chooseAnswer(key as OptionId);
-      } else if (!feedbackVisible && trueFalse && key === "T") {
-        chooseAnswer("A");
-      } else if (!feedbackVisible && trueFalse && key === "F") {
-        chooseAnswer("B");
+      const key = event.key.toUpperCase();
+      const trueOptionId = currentQuestion.options.find((option) => option.text.toLowerCase() === "true")?.id;
+      const falseOptionId = currentQuestion.options.find((option) => option.text.toLowerCase() === "false")?.id;
+      const displayedKeyOptionId = /^[A-F]$/.test(key)
+        ? optionIdForDisplayedKey(key, displayedOptionIds)
+        : undefined;
+
+      if (!feedbackVisible && displayedKeyOptionId) {
+        chooseAnswer(displayedKeyOptionId);
+      } else if (!feedbackVisible && key === "T" && trueOptionId) {
+        chooseAnswer(trueOptionId);
+      } else if (!feedbackVisible && key === "F" && falseOptionId) {
+        chooseAnswer(falseOptionId);
       } else if (!feedbackVisible && key === "S") {
         skipQuestion();
       } else if (event.key === "Enter") {
@@ -385,6 +420,7 @@ export function ExamPrepApp() {
           index={questionIndex}
           total={sessionIds.length}
           selectedIds={selectedIds}
+          displayedOptionIds={displayedOptionIds}
           feedbackVisible={feedbackVisible}
           showProgressBar={mode !== "exam" || examSettings.showProgressBar}
           status={progress[currentQuestion.id]?.status ?? "new"}
@@ -554,7 +590,7 @@ function SetupScreen({
 
           <div className="start-row">
             <button className="primary-button" disabled={!availableQuestions.length} onClick={onStart}>{availableQuestions.length ? `${mode === "exam" ? "Begin exam" : mode === "review" ? "Start review" : "Start practice"} · ${startCount}` : mode === "review" ? "Review bin is clear" : mode === "exam" ? "No questions in this exam" : "No unanswered questions"}<span>→</span></button>
-            <span className="shortcut-hint"><kbd>A</kbd>–<kbd>F</kbd> · <kbd>S</kbd> skip · <kbd>Enter</kbd> submit/continue</span>
+            <span className="shortcut-hint"><kbd>A</kbd>–<kbd>F</kbd> · <kbd>S</kbd> skip · <kbd>Enter</kbd> submit/continue · answers reshuffle each time</span>
           </div>
         </div>
       </section>
@@ -598,6 +634,7 @@ function SessionScreen({
   index,
   total,
   selectedIds,
+  displayedOptionIds,
   feedbackVisible,
   showProgressBar,
   status,
@@ -614,6 +651,7 @@ function SessionScreen({
   index: number;
   total: number;
   selectedIds: OptionId[];
+  displayedOptionIds: OptionId[];
   feedbackVisible: boolean;
   showProgressBar: boolean;
   status: "new" | "done" | "review";
@@ -627,8 +665,15 @@ function SessionScreen({
 }) {
   const expectedIds = correctOptionIds(question);
   const isCorrect = feedbackVisible && isCorrectSelection(question, selectedIds);
-  const selectedLabel = answerLabel(selectedIds);
-  const longOptions = question.options.some((option) => option.text.replace(/\$+/g, "").length > 48);
+  const optionOrder = displayedOptionIds.length === question.options.length
+    ? displayedOptionIds
+    : question.options.map((option) => option.id);
+  const orderedOptions = optionOrder
+    .map((id) => question.options.find((option) => option.id === id))
+    .filter((option): option is QuestionOption => Boolean(option));
+  const selectedLabel = displayedAnswerLabel(selectedIds, optionOrder);
+  const expectedLabel = displayedAnswerLabel(expectedIds, optionOrder);
+  const longOptions = orderedOptions.some((option) => option.text.replace(/\$+/g, "").length > 48);
 
   return (
     <div className="session-page">
@@ -646,10 +691,11 @@ function SessionScreen({
         <div className="prompt"><LatexText text={question.prompt} /></div>
 
         <div className={`answer-grid options-${question.options.length} ${longOptions ? "long-options" : ""}`}>
-          {question.options.map((option) => {
+          {orderedOptions.map((option, optionIndex) => {
             const selected = selectedIds.includes(option.id);
             const correct = feedbackVisible && expectedIds.includes(option.id);
             const incorrect = feedbackVisible && selected && !correct;
+            const displayId = DISPLAY_OPTION_IDS[optionIndex] ?? option.id;
             return (
               <button
                 key={option.id}
@@ -657,7 +703,7 @@ function SessionScreen({
                 disabled={feedbackVisible}
                 onClick={() => onChoose(option.id)}
               >
-                <kbd>{option.id}</kbd>
+                <kbd>{displayId}</kbd>
                 <span><LatexText text={option.text} /></span>
               </button>
             );
@@ -691,7 +737,7 @@ function SessionScreen({
         {feedbackVisible && (
           <div className={`feedback ${isCorrect ? "correct" : "incorrect"}`} role="status">
             <div className="feedback-icon">{isCorrect ? "✓" : "×"}</div>
-            <div><strong>{isCorrect ? "Correct" : `Incorrect · Correct answer${expectedIds.length > 1 ? "s" : ""}: ${answerLabel(expectedIds)}`}</strong><p><LatexText text={question.explanation} /></p><small>{question.source}</small></div>
+            <div><strong>{isCorrect ? "Correct" : `Incorrect · Correct answer${expectedIds.length > 1 ? "s" : ""}: ${expectedLabel}`}</strong><p><LatexText text={question.explanation} /></p><small>{question.source}</small></div>
           </div>
         )}
 
@@ -758,16 +804,21 @@ function ResultsScreen({
               const question = questions.find((item) => item.id === answer.questionId);
               if (!question) return null;
               const expectedIds = correctOptionIds(question);
-              const selectedOptions = question.options.filter((option) => answer.selectedIds.includes(option.id));
-              const correctOptions = question.options.filter((option) => expectedIds.includes(option.id));
+              const optionRank = new Map(answer.optionOrder.map((id, rank) => [id, rank]));
+              const selectedOptions = question.options
+                .filter((option) => answer.selectedIds.includes(option.id))
+                .sort((left, right) => (optionRank.get(left.id) ?? 99) - (optionRank.get(right.id) ?? 99));
+              const correctOptions = question.options
+                .filter((option) => expectedIds.includes(option.id))
+                .sort((left, right) => (optionRank.get(left.id) ?? 99) - (optionRank.get(right.id) ?? 99));
               const isReview = progress[question.id]?.status === "review";
               const wasSkipped = answer.selectedIds.length === 0;
               return <details key={question.id} className={`answer-item ${answer.correct ? "correct" : "incorrect"}`} open={mode === "exam" || !answer.correct}>
-                <summary><span className="result-index">{String(index + 1).padStart(2, "0")}</span><span className="result-mark">{wasSkipped ? "—" : answer.correct ? "✓" : "×"}</span><span className="result-question"><small>{question.examId} · Question {question.number} · {question.topic}</small><LatexText text={question.prompt} /></span><span className="result-answer">{answerLabel(answer.selectedIds)} / {answerLabel(expectedIds)}</span></summary>
+                <summary><span className="result-index">{String(index + 1).padStart(2, "0")}</span><span className="result-mark">{wasSkipped ? "—" : answer.correct ? "✓" : "×"}</span><span className="result-question"><small>{question.examId} · Question {question.number} · {question.topic}</small><LatexText text={question.prompt} /></span><span className="result-answer">{displayedAnswerLabel(answer.selectedIds, answer.optionOrder)} / {displayedAnswerLabel(expectedIds, answer.optionOrder)}</span></summary>
                 <div className="answer-detail">
                   {question.setup && <div className="answer-setup"><LatexText text={question.setup} /></div>}
-                  {wasSkipped ? <p><strong>Your answer:</strong> Skipped.</p> : <p><strong>Your answer:</strong> {selectedOptions.map((option) => `${option.id}. ${option.text}`).join(" · ")}</p>}
-                  <p><strong>Correct answer{expectedIds.length > 1 ? "s" : ""}:</strong> {correctOptions.map((option) => `${option.id}. ${option.text}`).join(" · ")}</p>
+                  {wasSkipped ? <p><strong>Your answer:</strong> Skipped.</p> : <p><strong>Your answer:</strong> {selectedOptions.map((option) => `${displayedOptionLabel(option.id, answer.optionOrder)}. ${option.text}`).join(" · ")}</p>}
+                  <p><strong>Correct answer{expectedIds.length > 1 ? "s" : ""}:</strong> {correctOptions.map((option) => `${displayedOptionLabel(option.id, answer.optionOrder)}. ${option.text}`).join(" · ")}</p>
                   <div className="solution-copy"><LatexText text={question.explanation} /></div>
                   <div className="review-toggle">{isReview ? <><span>In Review</span><button className="text-button" onClick={() => onDone(question.id)}>Move to Done</button></> : <button className="secondary-button compact" onClick={() => onQueueReview(question.id)}>Save to Review</button>}</div>
                 </div>
