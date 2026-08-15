@@ -36,7 +36,10 @@ export function saveEdits(edits: EditStore) {
 }
 
 export function applyEdits(question: Question, edit?: QuestionEdit): Question {
-  return edit ? { ...question, ...edit, id: question.id, examId: question.examId } : question;
+  if (!edit) return question;
+  const { commonSetupQuestionIds, ...questionEdit } = edit;
+  void commonSetupQuestionIds;
+  return { ...question, ...questionEdit, id: question.id, examId: question.examId };
 }
 
 export function answerProgress(
@@ -77,4 +80,3 @@ export function shuffle<T>(items: T[]) {
   }
   return copy;
 }
-
