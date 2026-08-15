@@ -51,5 +51,7 @@ export type QuestionEdit = Partial<
     Question,
     "setup" | "prompt" | "options" | "correctOptionId" | "explanation" | "topic" | "difficulty" | "figure" | "figureAlt" | "figureCaption"
   >
->;
+> & {
+  commonSetupQuestionIds?: string[];
+};
 export type EditStore = Record<string, QuestionEdit>;
