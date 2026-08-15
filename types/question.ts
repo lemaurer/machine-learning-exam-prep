@@ -31,6 +31,7 @@ export type Question = {
   topic: Topic;
   difficulty: Difficulty;
   source: string;
+  figureNumber?: number;
   figure?: string;
   figureAlt?: string;
   figureCaption?: string;
@@ -49,9 +50,10 @@ export type ProgressStore = Record<string, QuestionProgress>;
 export type QuestionEdit = Partial<
   Pick<
     Question,
-    "setup" | "prompt" | "options" | "correctOptionId" | "explanation" | "topic" | "difficulty" | "figure" | "figureAlt" | "figureCaption"
+    "setup" | "prompt" | "options" | "correctOptionId" | "explanation" | "topic" | "difficulty" | "figureNumber" | "figure" | "figureAlt" | "figureCaption"
   >
 > & {
   commonSetupQuestionIds?: string[];
+  sharedFigureQuestionIds?: string[];
 };
 export type EditStore = Record<string, QuestionEdit>;
