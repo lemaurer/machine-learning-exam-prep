@@ -5,6 +5,7 @@ import { DIFFICULTIES, TOPICS, type Question, type QuestionEdit } from "../../ty
 import { LatexText } from "./LatexText";
 import { resolveAssetUrl } from "../../lib/assets";
 import { inferFigureNumber } from "../../lib/question-edits";
+import { correctOptionIds } from "../../lib/answers";
 
 function loadImageFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -129,12 +130,15 @@ export function QuestionEditor({
             .map((candidate) => candidate.id),
         ])]
       : [];
+    const correctIds = correctOptionIds(draft);
 
     onSave({
       setup: draft.setup,
       prompt: draft.prompt,
       options: draft.options,
-      correctOptionId: draft.correctOptionId,
+      correctOptionId: correctIds[0] ?? draft.correctOptionId,
+      correctOptionIds: correctIds,
+      multipleSelect: draft.multipleSelect,
       explanation: draft.explanation,
       topic: draft.topic,
       difficulty: draft.difficulty,
@@ -158,44 +162,23 @@ export function QuestionEditor({
 
       <label className="editor-field">
         <span>Common setup · LaTeX supported</span>
-        <textarea
-          value={draft.setup ?? ""}
-          onChange={(event) => setDraft({ ...draft, setup: event.target.value || undefined })}
-          rows={7}
-          placeholder="Optional setup shared by related questions"
-        />
+        <textarea value={draft.setup ?? ""} onChange={(event) => setDraft({ ...draft, setup: event.target.value || undefined })} rows={7} placeholder="Optional setup shared by related questions" />
       </label>
 
       <label className="editor-field">
         <span>Common setup applies to question numbers</span>
-        <input
-          value={commonSetupNumbers}
-          onChange={(event) => {
-            setCommonSetupNumbers(event.target.value);
-            setCommonSetupError("");
-          }}
-          placeholder="e.g. 7, 8, 9 or 7-9"
-        />
+        <input value={commonSetupNumbers} onChange={(event) => { setCommonSetupNumbers(event.target.value); setCommonSetupError(""); }} placeholder="e.g. 7, 8, 9 or 7-9" />
         <small>Leave blank to keep the setup specific to this question. If you enter a group, Question {question.number} is included automatically. Editing the common setup later from any member updates the whole group.</small>
       </label>
       {commonSetupError && <p className="editor-error" role="alert">{commonSetupError}</p>}
 
-      {draft.setup && (
-        <div className="live-preview">
-          <span>Setup rendering</span>
-          <div><LatexText text={draft.setup} /></div>
-        </div>
-      )}
+      {draft.setup && <div className="live-preview"><span>Setup rendering</span><div><LatexText text={draft.setup} /></div></div>}
 
       <label className="editor-field">
         <span>Question · LaTeX supported</span>
         <textarea value={draft.prompt} onChange={(event) => setDraft({ ...draft, prompt: event.target.value })} rows={5} />
       </label>
-
-      <div className="live-preview">
-        <span>Live rendering</span>
-        <div><LatexText text={draft.prompt} /></div>
-      </div>
+      <div className="live-preview"><span>Live rendering</span><div><LatexText text={draft.prompt} /></div></div>
 
       <div className="editor-figure-section">
         <div className="editor-figure-heading">
@@ -204,73 +187,47 @@ export function QuestionEditor({
         </div>
         <label className="editor-field">
           <span>Figure number</span>
-          <input
-            inputMode="numeric"
-            value={figureNumberText}
-            placeholder="e.g. 4"
-            onChange={(event) => {
-              setFigureNumberText(event.target.value);
-              setFigureError("");
-            }}
-          />
+          <input inputMode="numeric" value={figureNumberText} placeholder="e.g. 4" onChange={(event) => { setFigureNumberText(event.target.value); setFigureError(""); }} />
           <small>The number identifies the shared figure within this exam. Existing filenames such as <code>hs25_figure4.png</code> are recognized automatically.</small>
         </label>
         <label className="editor-field">
           <span>Figure path or URL</span>
-          <input
-            value={draft.figure ?? ""}
-            placeholder="/figures/filename.png"
-            onChange={(event) => {
-              setDraft({ ...draft, figure: event.target.value || undefined });
-              setFigureError("");
-            }}
-          />
+          <input value={draft.figure ?? ""} placeholder="/figures/filename.png" onChange={(event) => { setDraft({ ...draft, figure: event.target.value || undefined }); setFigureError(""); }} />
         </label>
         <label className="editor-file-button">
           <span>{figureLoading ? "Preparing image…" : "Choose an image from this computer"}</span>
-          <input
-            type="file"
-            accept="image/*"
-            disabled={figureLoading}
-            onChange={async (event) => {
-              const file = event.target.files?.[0];
-              if (!file) return;
-              setFigureError("");
-              setFigureLoading(true);
-              try {
-                const figure = await loadImageFile(file);
-                setDraft((current) => ({ ...current, figure }));
-              } catch (error) {
-                setFigureError(error instanceof Error ? error.message : "Could not use that image.");
-              } finally {
-                setFigureLoading(false);
-              }
-            }}
-          />
+          <input type="file" accept="image/*" disabled={figureLoading} onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            setFigureError("");
+            setFigureLoading(true);
+            try {
+              const figure = await loadImageFile(file);
+              setDraft((current) => ({ ...current, figure }));
+            } catch (error) {
+              setFigureError(error instanceof Error ? error.message : "Could not use that image.");
+            } finally {
+              setFigureLoading(false);
+            }
+          }} />
         </label>
         {figureError && <p className="editor-error" role="alert">{figureError}</p>}
         <label className="editor-field">
           <span>Alternative text</span>
-          <input
-            value={draft.figureAlt ?? ""}
-            placeholder="Describe the figure for accessibility"
-            onChange={(event) => setDraft({ ...draft, figureAlt: event.target.value || undefined })}
-          />
+          <input value={draft.figureAlt ?? ""} placeholder="Describe the figure for accessibility" onChange={(event) => setDraft({ ...draft, figureAlt: event.target.value || undefined })} />
         </label>
         <label className="editor-field">
           <span>Figure caption · LaTeX supported</span>
-          <input
-            value={draft.figureCaption ?? ""}
-            placeholder="Caption shown below the figure"
-            onChange={(event) => setDraft({ ...draft, figureCaption: event.target.value || undefined })}
-          />
+          <input value={draft.figureCaption ?? ""} placeholder="Caption shown below the figure" onChange={(event) => setDraft({ ...draft, figureCaption: event.target.value || undefined })} />
         </label>
-        {draft.figure && (
+        {draft.figure ? (
           <figure className="editor-figure-preview">
             <img src={resolveAssetUrl(draft.figure)} alt={draft.figureAlt || "Figure preview"} />
             {draft.figureCaption && <figcaption><LatexText text={draft.figureCaption} /></figcaption>}
           </figure>
-        )}
+        ) : figureNumberText.trim() ? (
+          <div className="live-preview"><span>Figure placeholder</span><div>Figure {figureNumberText.trim()} is linked but has no image yet.</div></div>
+        ) : null}
         {draft.figure && <button className="text-button danger" onClick={() => setDraft({ ...draft, figure: undefined, figureAlt: undefined, figureCaption: undefined })}>Remove figure</button>}
       </div>
 
@@ -278,14 +235,11 @@ export function QuestionEditor({
         {draft.options.map((option, index) => (
           <label key={option.id} className="editor-field option-edit">
             <span>Option {option.id}</span>
-            <input
-              value={option.text}
-              onChange={(event) => {
-                const next = [...draft.options];
-                next[index] = { ...option, text: event.target.value };
-                setDraft({ ...draft, options: next });
-              }}
-            />
+            <input value={option.text} onChange={(event) => {
+              const next = [...draft.options];
+              next[index] = { ...option, text: event.target.value };
+              setDraft({ ...draft, options: next });
+            }} />
             <small><LatexText text={option.text} /></small>
           </label>
         ))}
@@ -293,33 +247,56 @@ export function QuestionEditor({
 
       <div className="editor-selects">
         <label className="editor-field">
-          <span>Correct answer</span>
-          <select value={draft.correctOptionId} onChange={(event) => setDraft({ ...draft, correctOptionId: event.target.value as Question["correctOptionId"] })}>
-            {draft.options.map((option) => <option key={option.id}>{option.id}</option>)}
+          <span>Question type</span>
+          <select value={draft.multipleSelect ? "multiple" : "single"} onChange={(event) => {
+            const multipleSelect = event.target.value === "multiple";
+            const currentCorrect = correctOptionIds(draft);
+            setDraft({
+              ...draft,
+              multipleSelect,
+              correctOptionId: currentCorrect[0] ?? draft.options[0]?.id ?? "A",
+              correctOptionIds: multipleSelect ? currentCorrect : [currentCorrect[0] ?? draft.options[0]?.id ?? "A"],
+            });
+          }}>
+            <option value="single">Single answer</option>
+            <option value="multiple">Mark all that apply</option>
           </select>
         </label>
         <label className="editor-field">
           <span>Topic</span>
-          <select value={draft.topic} onChange={(event) => setDraft({ ...draft, topic: event.target.value as Question["topic"] })}>
-            {TOPICS.map((topic) => <option key={topic}>{topic}</option>)}
-          </select>
+          <select value={draft.topic} onChange={(event) => setDraft({ ...draft, topic: event.target.value as Question["topic"] })}>{TOPICS.map((topic) => <option key={topic}>{topic}</option>)}</select>
         </label>
         <label className="editor-field">
           <span>Difficulty</span>
-          <select value={draft.difficulty} onChange={(event) => setDraft({ ...draft, difficulty: event.target.value as Question["difficulty"] })}>
-            {DIFFICULTIES.map((difficulty) => <option key={difficulty}>{difficulty}</option>)}
-          </select>
+          <select value={draft.difficulty} onChange={(event) => setDraft({ ...draft, difficulty: event.target.value as Question["difficulty"] })}>{DIFFICULTIES.map((difficulty) => <option key={difficulty}>{difficulty}</option>)}</select>
         </label>
+      </div>
+
+      <div className="editor-field">
+        <span>Correct answer{draft.multipleSelect ? "s" : ""}</span>
+        <div className="segmented" role="group" aria-label="Correct answers">
+          {draft.options.map((option) => {
+            const currentCorrect = correctOptionIds(draft);
+            const active = currentCorrect.includes(option.id);
+            return <button key={option.id} type="button" className={active ? "active" : ""} onClick={() => {
+              if (!draft.multipleSelect) {
+                setDraft({ ...draft, correctOptionId: option.id, correctOptionIds: [option.id] });
+                return;
+              }
+              const nextCorrect = active ? currentCorrect.filter((id) => id !== option.id) : [...currentCorrect, option.id];
+              if (!nextCorrect.length) return;
+              setDraft({ ...draft, correctOptionId: nextCorrect[0], correctOptionIds: nextCorrect });
+            }}>{option.id}</button>;
+          })}
+        </div>
+        <small>{draft.multipleSelect ? "Select every answer that should be required for full credit." : "Select the single correct answer."}</small>
       </div>
 
       <label className="editor-field">
         <span>Explanation · LaTeX supported</span>
         <textarea value={draft.explanation} onChange={(event) => setDraft({ ...draft, explanation: event.target.value })} rows={7} />
       </label>
-      <div className="live-preview explanation-preview">
-        <span>Explanation preview</span>
-        <div><LatexText text={draft.explanation} /></div>
-      </div>
+      <div className="live-preview explanation-preview"><span>Explanation preview</span><div><LatexText text={draft.explanation} /></div></div>
 
       <div className="editor-actions">
         {hasLocalEdit && <button className="text-button danger" onClick={onReset}>Restore supplied version</button>}
