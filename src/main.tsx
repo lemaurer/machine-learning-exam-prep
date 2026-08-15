@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "katex/dist/katex.min.css";
 import "../app/globals.css";
+import "../data/hs25-additions";
 import { ExamPrepApp } from "../app/ExamPrepApp";
 
 const root = document.getElementById("root");
@@ -13,4 +14,3 @@ createRoot(root).render(
     <ExamPrepApp />
   </StrictMode>,
 );
-
