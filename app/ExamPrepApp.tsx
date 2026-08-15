@@ -14,6 +14,11 @@ import {
   setQuestionStatus,
   shuffle,
 } from "../lib/progress";
+import {
+  applyQuestionEditWithCommonSetup,
+  inferCommonSetupQuestionIds,
+  removeQuestionEditFromCommonSetup,
+} from "../lib/question-edits";
 import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
 import { resolveAssetUrl } from "../lib/assets";
 import {
@@ -226,9 +231,9 @@ export function ExamPrepApp() {
     }));
   }
 
-  function saveQuestionEdit(questionId: string, edit: QuestionEdit) {
+  function saveQuestionEdit(questionId: string, edit: QuestionEdit, commonSetupQuestionIds: string[]) {
     setEdits((current) => {
-      const next = { ...current, [questionId]: edit };
+      const next = applyQuestionEditWithCommonSetup(current, questionId, edit, commonSetupQuestionIds);
       saveEdits(next);
       return next;
     });
@@ -237,8 +242,7 @@ export function ExamPrepApp() {
 
   function resetQuestionEdit(questionId: string) {
     setEdits((current) => {
-      const { [questionId]: removed, ...next } = current;
-      void removed;
+      const next = removeQuestionEditFromCommonSetup(current, questionId);
       saveEdits(next);
       return next;
     });
@@ -371,8 +375,10 @@ export function ExamPrepApp() {
       {editing && currentQuestion && (
         <QuestionEditor
           question={currentQuestion}
+          examQuestions={questions.filter((question) => question.examId === currentQuestion.examId)}
+          sharedSetupQuestionIds={inferCommonSetupQuestionIds(currentQuestion, questions, edits[currentQuestion.id])}
           hasLocalEdit={Boolean(edits[currentQuestion.id])}
-          onSave={(edit) => saveQuestionEdit(currentQuestion.id, edit)}
+          onSave={(edit, commonSetupQuestionIds) => saveQuestionEdit(currentQuestion.id, edit, commonSetupQuestionIds)}
           onReset={() => resetQuestionEdit(currentQuestion.id)}
           onClose={() => setEditing(false)}
         />
