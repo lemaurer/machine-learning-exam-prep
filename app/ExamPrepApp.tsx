@@ -250,7 +250,7 @@ export function ExamPrepApp() {
   }
 
   function resetProgress() {
-    if (!window.confirm("Reset all Done and Review progress on this device? Local question edits will remain.")) return;
+    if (!window.confirm("Reset all Done and Review progress? Question edits will remain.")) return;
     window.localStorage.removeItem(PROGRESS_KEY);
     setProgress({});
   }
@@ -496,7 +496,7 @@ function SetupScreen({
       </section>
 
       <aside className="stats-panel">
-        <div className="stats-heading"><span className="eyebrow">Local progress</span><span className="local-pill">On this device</span></div>
+        <div className="stats-heading"><span className="eyebrow">Study progress</span><span className="local-pill">Autosaved</span></div>
         <div className="stat-grid">
           <div><strong>{totals.newCount}</strong><span>new</span></div>
           <div><strong>{totals.done}</strong><span>done</span></div>
@@ -506,7 +506,7 @@ function SetupScreen({
         <div className="source-note"><span>Question bank</span><strong>{sourceQuestions.length} supplied questions · {EXAMS.length} exam{EXAMS.length === 1 ? "" : "s"}</strong><p>Imported from the supplied exam material. No additional questions have been generated.</p></div>
         <div className="local-actions">
           <button className="text-button" onClick={onResetProgress}>Reset Done & Review progress</button>
-          {editedCount > 0 && <button className="text-button" onClick={onResetEdits}>Restore {editedCount} local edit{editedCount === 1 ? "" : "s"}</button>}
+          {editedCount > 0 && <button className="text-button" onClick={onResetEdits}>Restore {editedCount} edit{editedCount === 1 ? "" : "s"}</button>}
         </div>
       </aside>
     </div>
