@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { questions } from "../data/questions";
 import { answerProgress, setQuestionStatus } from "../lib/progress";
-import { questionsAvailableForMode, uniqueQuestionsById } from "../lib/question-selection";
+import { questionsAvailableForMode, questionsForExam, uniqueQuestionsById } from "../lib/question-selection";
 import type { ProgressStore } from "../types/question";
 
 test("the supplied bank contains 13 questions with stable unique ids", () => {
@@ -18,7 +18,7 @@ test("a duplicated source entry can never create a repeated session question", (
   );
 });
 
-test("Practice and Exam only receive new questions, while Review only receives review questions", () => {
+test("Practice receives new questions, Review receives review questions, and Exam ignores study progress", () => {
   const progress: ProgressStore = {
     [questions[0].id]: setQuestionStatus(undefined, "done"),
     [questions[1].id]: setQuestionStatus(undefined, "review"),
@@ -26,8 +26,15 @@ test("Practice and Exam only receive new questions, while Review only receives r
   const sample = questions.slice(0, 3);
 
   assert.deepEqual(questionsAvailableForMode(sample, progress, "practice").map((question) => question.id), [questions[2].id]);
-  assert.deepEqual(questionsAvailableForMode(sample, progress, "exam").map((question) => question.id), [questions[2].id]);
+  assert.deepEqual(questionsAvailableForMode(sample, progress, "exam").map((question) => question.id), sample.map((question) => question.id));
   assert.deepEqual(questionsAvailableForMode(sample, progress, "review").map((question) => question.id), [questions[1].id]);
+});
+
+test("an exam run contains every question from the selected exam in question-number order", () => {
+  const shuffled = [questions[4], questions[0], questions[2], questions[1]];
+  const selected = questionsForExam(shuffled, "HS25");
+
+  assert.deepEqual(selected.map((question) => question.number), [5, 7, 8, 10]);
 });
 
 test("incorrect answers enter Review and a correct review answer moves to Done", () => {
@@ -38,4 +45,3 @@ test("incorrect answers enter Review and a correct review answer moves to Done",
   assert.equal(corrected.status, "done");
   assert.equal(corrected.attempts, 2);
 });
-
