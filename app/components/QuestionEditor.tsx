@@ -29,24 +29,96 @@ function loadImageFile(file: File): Promise<string> {
   });
 }
 
+function parseQuestionNumbers(value: string): number[] | null {
+  if (!value.trim()) return [];
+  const numbers: number[] = [];
+
+  for (const rawPart of value.split(",")) {
+    const part = rawPart.trim();
+    if (!part) continue;
+    const range = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (range) {
+      const start = Number(range[1]);
+      const end = Number(range[2]);
+      const low = Math.min(start, end);
+      const high = Math.max(start, end);
+      for (let number = low; number <= high; number += 1) numbers.push(number);
+      continue;
+    }
+    if (!/^\d+$/.test(part)) return null;
+    numbers.push(Number(part));
+  }
+
+  return [...new Set(numbers)].sort((left, right) => left - right);
+}
+
 export function QuestionEditor({
   question,
+  examQuestions,
+  sharedSetupQuestionIds,
   hasLocalEdit,
   onSave,
   onReset,
   onClose,
 }: {
   question: Question;
+  examQuestions: Question[];
+  sharedSetupQuestionIds: string[];
   hasLocalEdit: boolean;
-  onSave: (edit: QuestionEdit) => void;
+  onSave: (edit: QuestionEdit, commonSetupQuestionIds: string[]) => void;
   onReset: () => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<Question>(question);
+  const [commonSetupNumbers, setCommonSetupNumbers] = useState("");
+  const [commonSetupError, setCommonSetupError] = useState("");
   const [figureError, setFigureError] = useState("");
   const [figureLoading, setFigureLoading] = useState(false);
 
-  useEffect(() => setDraft(question), [question]);
+  useEffect(() => {
+    setDraft(question);
+    const numberById = new Map(examQuestions.map((candidate) => [candidate.id, candidate.number]));
+    setCommonSetupNumbers(
+      sharedSetupQuestionIds
+        .map((id) => numberById.get(id))
+        .filter((number): number is number => typeof number === "number")
+        .sort((left, right) => left - right)
+        .join(", "),
+    );
+    setCommonSetupError("");
+  }, [examQuestions, question, sharedSetupQuestionIds]);
+
+  function save() {
+    const numbers = parseQuestionNumbers(commonSetupNumbers);
+    if (numbers === null) {
+      setCommonSetupError("Use question numbers separated by commas, or a range such as 7-9.");
+      return;
+    }
+
+    const questionByNumber = new Map(examQuestions.map((candidate) => [candidate.number, candidate]));
+    const missing = numbers.filter((number) => !questionByNumber.has(number));
+    if (missing.length) {
+      setCommonSetupError(`Question${missing.length === 1 ? "" : "s"} ${missing.join(", ")} ${missing.length === 1 ? "does" : "do"} not exist in ${question.examId}.`);
+      return;
+    }
+
+    const commonSetupQuestionIds = numbers.length
+      ? [...new Set([question.id, ...numbers.map((number) => questionByNumber.get(number)!.id)])]
+      : [];
+
+    onSave({
+      setup: draft.setup,
+      prompt: draft.prompt,
+      options: draft.options,
+      correctOptionId: draft.correctOptionId,
+      explanation: draft.explanation,
+      topic: draft.topic,
+      difficulty: draft.difficulty,
+      figure: draft.figure,
+      figureAlt: draft.figureAlt,
+      figureCaption: draft.figureCaption,
+    }, commonSetupQuestionIds);
+  }
 
   return (
     <aside className="editor-panel" aria-label="Question editor">
@@ -67,6 +139,20 @@ export function QuestionEditor({
           placeholder="Optional setup shared by related questions"
         />
       </label>
+
+      <label className="editor-field">
+        <span>Common setup applies to question numbers</span>
+        <input
+          value={commonSetupNumbers}
+          onChange={(event) => {
+            setCommonSetupNumbers(event.target.value);
+            setCommonSetupError("");
+          }}
+          placeholder="e.g. 7, 8, 9 or 7-9"
+        />
+        <small>Leave blank to keep the setup specific to this question. If you enter a group, Question {question.number} is included automatically. Editing the common setup later from any member updates the whole group.</small>
+      </label>
+      {commonSetupError && <p className="editor-error" role="alert">{commonSetupError}</p>}
 
       {draft.setup && (
         <div className="live-preview">
@@ -195,21 +281,7 @@ export function QuestionEditor({
 
       <div className="editor-actions">
         {hasLocalEdit && <button className="text-button danger" onClick={onReset}>Restore supplied version</button>}
-        <button
-          className="primary-button compact"
-          onClick={() => onSave({
-            setup: draft.setup,
-            prompt: draft.prompt,
-            options: draft.options,
-            correctOptionId: draft.correctOptionId,
-            explanation: draft.explanation,
-            topic: draft.topic,
-            difficulty: draft.difficulty,
-            figure: draft.figure,
-            figureAlt: draft.figureAlt,
-            figureCaption: draft.figureCaption,
-          })}
-        >Save locally</button>
+        <button className="primary-button compact" onClick={save}>Save locally</button>
       </div>
     </aside>
   );
