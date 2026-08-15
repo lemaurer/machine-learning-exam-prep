@@ -37,23 +37,26 @@ export function saveEdits(edits: EditStore) {
 
 export function applyEdits(question: Question, edit?: QuestionEdit): Question {
   if (!edit) return question;
-  const { commonSetupQuestionIds, ...questionEdit } = edit;
+  const { commonSetupQuestionIds, sharedFigureQuestionIds, ...questionEdit } = edit;
   void commonSetupQuestionIds;
+  void sharedFigureQuestionIds;
   return { ...question, ...questionEdit, id: question.id, examId: question.examId };
 }
 
 export function answerProgress(
   previous: QuestionProgress | undefined,
-  answerId: QuestionOption["id"],
+  answerIds: QuestionOption["id"] | QuestionOption["id"][],
   correct: boolean,
   now = new Date(),
 ): QuestionProgress {
+  const selected = Array.isArray(answerIds) ? answerIds : [answerIds];
   return {
     status: correct ? "done" : "review",
     attempts: (previous?.attempts ?? 0) + 1,
     correct: (previous?.correct ?? 0) + (correct ? 1 : 0),
     incorrect: (previous?.incorrect ?? 0) + (correct ? 0 : 1),
-    lastAnswerId: answerId,
+    lastAnswerId: selected[0] ?? previous?.lastAnswerId ?? "A",
+    lastAnswerIds: selected,
     lastAnsweredAt: now.toISOString(),
   };
 }
@@ -68,6 +71,7 @@ export function setQuestionStatus(
     correct: previous?.correct ?? 0,
     incorrect: previous?.incorrect ?? 0,
     lastAnswerId: previous?.lastAnswerId ?? "A",
+    lastAnswerIds: previous?.lastAnswerIds ?? (previous?.lastAnswerId ? [previous.lastAnswerId] : []),
     lastAnsweredAt: previous?.lastAnsweredAt ?? new Date().toISOString(),
   };
 }
