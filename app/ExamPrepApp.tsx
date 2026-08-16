@@ -15,6 +15,7 @@ import {
 } from "../lib/progress";
 import {
   applyQuestionEditWithCommonSetup,
+  applySharedFigureImage,
   inferCommonSetupQuestionIds,
   removeQuestionEditFromCommonSetup,
 } from "../lib/question-edits";
@@ -36,6 +37,7 @@ import {
   uniqueQuestionsById,
 } from "../lib/question-selection";
 import { resolveAssetUrl } from "../lib/assets";
+import { loadImageFile } from "../lib/images";
 import {
   DIFFICULTIES,
   TOPICS,
@@ -293,6 +295,14 @@ export function ExamPrepApp() {
     setEditing(false);
   }
 
+  function saveFigureImage(question: Question, figure: string) {
+    setEdits((current) => {
+      const next = applySharedFigureImage(current, question, questions, figure);
+      saveEdits(next);
+      return next;
+    });
+  }
+
   function resetQuestionEdit(questionId: string) {
     setEdits((current) => {
       const next = removeQuestionEditFromCommonSetup(current, questionId);
@@ -424,6 +434,7 @@ export function ExamPrepApp() {
           onEdit={() => setEditing(true)}
           onEnd={endSession}
           onQueueReview={() => queueForReview(currentQuestion.id)}
+          onFigureUpload={(figure) => saveFigureImage(currentQuestion, figure)}
         />
       )}
 
@@ -607,16 +618,48 @@ function SetupScreen({
   );
 }
 
-function FigureBlock({ question }: { question: Question }) {
+function FigureBlock({ question, onUpload }: { question: Question; onUpload: (figure: string) => void }) {
+  const [loading, setLoading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [error, setError] = useState("");
+
+  async function useFile(file?: File) {
+    if (!file || loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      const figure = await loadImageFile(file);
+      onUpload(figure);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Could not use that image.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   if (question.figure) {
     return <figure><img src={resolveAssetUrl(question.figure)} alt={question.figureAlt ?? `Figure ${question.figureNumber ?? ""}`} />{question.figureCaption && <figcaption><LatexText text={question.figureCaption} /></figcaption>}</figure>;
   }
   if (!question.figureNumber) return null;
   return (
-    <figure>
-      <div style={{ border: "1px dashed #9aa19e", minHeight: 180, display: "grid", placeItems: "center", padding: 24, color: "#58645f", background: "#f6f5f0" }}>
-        <div><strong>Figure {question.figureNumber} placeholder</strong><br /><small>Add or replace Figure {question.figureNumber} through Edit question.</small></div>
-      </div>
+    <figure className="figure-placeholder-shell">
+      <label
+        className={`figure-dropzone ${dragActive ? "drag-active" : ""} ${loading ? "loading" : ""}`}
+        onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }}
+        onDragOver={(event) => { event.preventDefault(); setDragActive(true); }}
+        onDragLeave={(event) => { event.preventDefault(); setDragActive(false); }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragActive(false);
+          void useFile(event.dataTransfer.files?.[0]);
+        }}
+      >
+        <input type="file" accept="image/*" disabled={loading} onChange={(event) => void useFile(event.target.files?.[0])} />
+        <span className="figure-dropzone-number">Figure {question.figureNumber}</span>
+        <strong>{loading ? "Preparing image…" : "Drop an image here"}</strong>
+        <small>{loading ? "Resizing and compressing for the question bank" : "or click to choose an image"}</small>
+      </label>
+      {error && <p className="figure-dropzone-error" role="alert">{error}</p>}
       {question.figureCaption && <figcaption><LatexText text={question.figureCaption} /></figcaption>}
     </figure>
   );
@@ -639,6 +682,7 @@ function SessionScreen({
   onEdit,
   onEnd,
   onQueueReview,
+  onFigureUpload,
 }: {
   mode: SessionMode;
   question: Question;
@@ -656,6 +700,7 @@ function SessionScreen({
   onEdit: () => void;
   onEnd: () => void;
   onQueueReview: () => void;
+  onFigureUpload: (figure: string) => void;
 }) {
   const expectedIds = correctOptionIds(question);
   const isCorrect = feedbackVisible && isCorrectSelection(question, selectedIds);
@@ -681,7 +726,7 @@ function SessionScreen({
         <div className="question-meta"><span>{question.examId}</span><span>{question.topic}</span><span>{question.difficulty}</span><span>{question.source}</span>{question.multipleSelect && <span>Mark all that apply</span>}</div>
         <div className="exam-heading"><span>Question {question.number}</span><h1>{question.title}</h1></div>
         {question.setup && <div className="question-setup"><LatexText text={question.setup} /></div>}
-        <FigureBlock question={question} />
+        <FigureBlock question={question} onUpload={onFigureUpload} />
         <div className="prompt"><LatexText text={question.prompt} /></div>
 
         <div className={`answer-grid options-${question.options.length} ${longOptions ? "long-options" : ""}`}>
