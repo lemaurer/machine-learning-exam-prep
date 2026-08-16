@@ -7,6 +7,7 @@ import {
   displayedOptionLabel,
   isCorrectSelection,
   optionIdForDisplayedKey,
+  remapSolutionOptionReferences,
   shouldIgnoreAnswerShortcut,
   shuffledOptionIds,
 } from "../lib/answers";
@@ -116,6 +117,20 @@ test("displayed answer letters are randomized without changing answer correctnes
   assert.equal(displayedOptionLabel("C", order), "B");
   assert.equal(displayedAnswerLabel(["C"], order), "B");
   assert.equal(isCorrectSelection(q2, ["C"]), true, "correctness must still use the underlying answer content");
+});
+
+test("solution answer references follow the shuffled display labels without touching semantic A/B/C labels", () => {
+  const order = ["B", "C", "A", "D"] as const;
+  const displayOrder = [...order];
+
+  assert.equal(remapSolutionOptionReferences("Option C is correct.", displayOrder), "Option B is correct.");
+  assert.equal(remapSolutionOptionReferences("Correct answers: A and B", displayOrder), "Correct answers: C and A");
+  assert.equal(remapSolutionOptionReferences("C. This is the right choice.", displayOrder), "B. This is the right choice.");
+  assert.equal(remapSolutionOptionReferences("B is correct because the loss decreases.", displayOrder), "A is correct because the loss decreases.");
+  assert.equal(remapSolutionOptionReferences("[[A]] and [[C]] are the referenced options.", displayOrder), "C and B are the referenced options.");
+
+  const semantic = "Plot B matches $A=(1,1)$ and Panel C; the term $C$ stays mathematical.";
+  assert.equal(remapSolutionOptionReferences(semantic, displayOrder), semantic);
 });
 
 test("Command, Control, and Alt shortcuts are never interpreted as answers", () => {
