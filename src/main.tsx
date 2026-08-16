@@ -8,6 +8,7 @@ import "../data/hs24-additions";
 import "../data/fs25-additions";
 import "../data/fs24-additions";
 import "../data/hs23-additions";
+import "../data/fs23-additions";
 import { ExamPrepApp } from "../app/ExamPrepApp";
 import "../app/session-tight.css";
 
@@ -152,9 +153,9 @@ document.addEventListener("click", (event) => {
 }, true);
 
 /*
- * HS23 contains questions with G-I choices. The React shortcut handler predates
- * those exams and handles A-F, so map G-I to the visible answer button here.
- * Modified shortcuts remain untouched, preserving normal browser shortcuts.
+ * Some older exams contain questions with G-I choices. The React shortcut
+ * handler predates those exams and handles A-F, so map G-I to the visible
+ * answer button here. Modified shortcuts remain untouched.
  */
 document.addEventListener("keydown", (event) => {
   if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return;
