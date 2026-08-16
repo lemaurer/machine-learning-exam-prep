@@ -26,6 +26,7 @@ import {
   displayedOptionLabel,
   isCorrectSelection,
   optionIdForDisplayedKey,
+  remapSolutionOptionReferences,
   shouldIgnoreAnswerShortcut,
   shuffledOptionIds,
   type OptionId,
@@ -776,7 +777,7 @@ function SessionScreen({
         {feedbackVisible && (
           <div className={`feedback ${isCorrect ? "correct" : "incorrect"}`} role="status">
             <div className="feedback-icon">{isCorrect ? "✓" : "×"}</div>
-            <div><strong>{isCorrect ? "Correct" : `Incorrect · Correct answer${expectedIds.length > 1 ? "s" : ""}: ${expectedLabel}`}</strong><p><LatexText text={question.explanation} /></p><small>{question.source}</small></div>
+            <div><strong>{isCorrect ? "Correct" : `Incorrect · Correct answer${expectedIds.length > 1 ? "s" : ""}: ${expectedLabel}`}</strong><p><LatexText text={remapSolutionOptionReferences(question.explanation, optionOrder)} /></p><small>{question.source}</small></div>
           </div>
         )}
 
@@ -858,7 +859,7 @@ function ResultsScreen({
                   {question.setup && <div className="answer-setup"><LatexText text={question.setup} /></div>}
                   {wasSkipped ? <p><strong>Your answer:</strong> Skipped.</p> : <p><strong>Your answer:</strong> {selectedOptions.map((option) => `${displayedOptionLabel(option.id, answer.optionOrder)}. ${option.text}`).join(" · ")}</p>}
                   <p><strong>Correct answer{expectedIds.length > 1 ? "s" : ""}:</strong> {correctOptions.map((option) => `${displayedOptionLabel(option.id, answer.optionOrder)}. ${option.text}`).join(" · ")}</p>
-                  <div className="solution-copy"><LatexText text={question.explanation} /></div>
+                  <div className="solution-copy"><LatexText text={remapSolutionOptionReferences(question.explanation, answer.optionOrder)} /></div>
                   <div className="review-toggle">{isReview ? <><span>In Review</span><button className="text-button" onClick={() => onDone(question.id)}>Move to Done</button></> : <button className="secondary-button compact" onClick={() => onQueueReview(question.id)}>Save to Review</button>}</div>
                 </div>
               </details>;
