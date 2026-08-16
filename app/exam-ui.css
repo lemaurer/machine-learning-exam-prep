@@ -1,6 +1,8 @@
 .answer-button {
   grid-template-columns: 34px minmax(0, 1fr) !important;
   gap: 14px !important;
+  min-width: 0;
+  overflow: hidden;
   padding: 14px 16px !important;
 }
 
@@ -9,8 +11,26 @@
 }
 
 .answer-button > span:last-child {
+  max-width: 100%;
   min-width: 0;
+  overflow: hidden;
   overflow-wrap: anywhere;
+}
+
+/* Keep long inline KaTeX inside the answer card. Most answers fit normally;
+   formulas that are intrinsically wider than the card can scroll within the
+   formula itself instead of spilling over the button boundary. */
+.answer-button .latex-inline {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.answer-button .latex-inline .katex {
+  font-size: .96em;
 }
 
 .answer-grid.long-options {
@@ -376,6 +396,10 @@
   .answer-grid,
   .answer-grid.options-3 {
     grid-template-columns: 1fr !important;
+  }
+
+  .answer-button {
+    padding: 12px 13px !important;
   }
 
   .compact-setup-layout {
