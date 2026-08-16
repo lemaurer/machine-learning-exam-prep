@@ -5,6 +5,7 @@ import "katex/dist/katex.min.css";
 import "../app/globals.css";
 import "../data/hs25-additions";
 import { ExamPrepApp } from "../app/ExamPrepApp";
+import "../app/session-tight.css";
 
 const root = document.getElementById("root");
 
