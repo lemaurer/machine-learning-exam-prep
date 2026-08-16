@@ -50,7 +50,7 @@ function protectedDisplayedLabel(optionId: OptionId, optionOrder: OptionId[]) {
 }
 
 function remapLetterList(value: string, optionOrder: OptionId[]) {
-  return value.replace(/[A-F]/gi, (letter) => protectedDisplayedLabel(letter.toUpperCase() as OptionId, optionOrder));
+  return value.replace(/[A-F]/g, (letter) => protectedDisplayedLabel(letter as OptionId, optionOrder));
 }
 
 function restoreProtectedLabels(value: string) {
