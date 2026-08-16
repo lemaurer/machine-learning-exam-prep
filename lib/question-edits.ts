@@ -36,6 +36,38 @@ export function inferCommonSetupQuestionIds(
   return inferred.length > 1 ? inferred : [];
 }
 
+export function applySharedFigureImage(
+  current: EditStore,
+  question: Question,
+  questions: Question[],
+  figure: string,
+) {
+  const figureNumber = inferFigureNumber(question);
+  if (!figureNumber) return current;
+
+  const members = questions.filter(
+    (candidate) => candidate.examId === question.examId && inferFigureNumber(candidate) === figureNumber,
+  );
+  const memberIds = uniqueIds([question.id, ...members.map((candidate) => candidate.id)]);
+  const sharedFigureQuestionIds = memberIds.length > 1 ? memberIds : undefined;
+  const next: EditStore = { ...current };
+  const figureAlt = question.figureAlt ?? `Figure ${figureNumber}`;
+  const figureCaption = question.figureCaption;
+
+  for (const memberId of memberIds) {
+    next[memberId] = {
+      ...(current[memberId] ?? {}),
+      figureNumber,
+      figure,
+      figureAlt,
+      figureCaption,
+      sharedFigureQuestionIds,
+    };
+  }
+
+  return next;
+}
+
 export function applyQuestionEditWithCommonSetup(
   current: EditStore,
   questionId: string,
