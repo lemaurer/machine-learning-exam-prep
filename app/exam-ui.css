@@ -1,36 +1,45 @@
+.answer-grid {
+  gap: 10px !important;
+}
+
 .answer-button {
-  grid-template-columns: 34px minmax(0, 1fr) !important;
-  gap: 14px !important;
+  grid-template-columns: 30px minmax(0, 1fr) !important;
+  gap: 12px !important;
+  min-height: 50px !important;
   min-width: 0;
   overflow: hidden;
-  padding: 14px 16px !important;
+  padding: 8px 13px !important;
 }
 
 .answer-button .option-letter {
   display: none !important;
 }
 
+.answer-button kbd {
+  height: 25px !important;
+  width: 25px !important;
+}
+
 .answer-button > span:last-child {
+  font-size: 16.5px !important;
+  line-height: 1.25 !important;
   max-width: 100%;
   min-width: 0;
-  overflow: hidden;
   overflow-wrap: anywhere;
 }
 
-/* Keep long inline KaTeX inside the answer card. Most answers fit normally;
-   formulas that are intrinsically wider than the card can scroll within the
-   formula itself instead of spilling over the button boundary. */
+/* Inline math in an exam answer should look like normal typeset math, not a
+   miniature scroll container. Long answers already switch to a full-width row. */
 .answer-button .latex-inline {
-  display: inline-block;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  vertical-align: middle;
+  display: inline;
+  max-width: none;
+  overflow: visible;
+  vertical-align: baseline;
   white-space: nowrap;
 }
 
 .answer-button .latex-inline .katex {
-  font-size: .96em;
+  font-size: 1.08em;
 }
 
 .answer-grid.long-options {
@@ -38,7 +47,11 @@
 }
 
 .answer-grid.long-options .answer-button {
-  min-height: 72px;
+  min-height: 52px !important;
+}
+
+.answer-grid.long-options .latex-inline .katex {
+  font-size: 1.04em;
 }
 
 /* Setup and prompt stay separate, but use the same normal-weight exam typography. */
@@ -399,7 +412,12 @@
   }
 
   .answer-button {
-    padding: 12px 13px !important;
+    min-height: 48px !important;
+    padding: 9px 11px !important;
+  }
+
+  .answer-button > span:last-child {
+    font-size: 16px !important;
   }
 
   .compact-setup-layout {
