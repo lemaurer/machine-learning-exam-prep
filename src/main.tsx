@@ -4,6 +4,7 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import "../app/globals.css";
 import "../data/hs25-additions";
+import "../data/hs24-additions";
 import { ExamPrepApp } from "../app/ExamPrepApp";
 import "../app/session-tight.css";
 
