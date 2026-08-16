@@ -7,7 +7,7 @@
   gap: 12px !important;
   min-height: 50px !important;
   min-width: 0;
-  overflow: hidden;
+  overflow: clip;
   padding: 8px 13px !important;
 }
 
@@ -25,21 +25,46 @@
   line-height: 1.25 !important;
   max-width: 100%;
   min-width: 0;
+  overflow: visible !important;
   overflow-wrap: anywhere;
 }
 
-/* Inline math in an exam answer should look like normal typeset math, not a
-   miniature scroll container. Long answers already switch to a full-width row. */
-.answer-button .latex-inline {
-  display: inline;
-  max-width: none;
-  overflow: visible;
+/* Answer choices must never become miniature scrolling regions. Keep the
+   LaTeX inline, let the normal long-option layout provide the width, and clip
+   only at the outer card as a final safety net. */
+.answer-button .latex-inline,
+.answer-button .latex-display {
+  display: inline !important;
+  max-width: none !important;
+  overflow: visible !important;
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+  padding: 0 !important;
   vertical-align: baseline;
+  white-space: normal !important;
+}
+
+.answer-button .latex-inline .katex,
+.answer-button .latex-display .katex {
+  font-size: 1.08em;
   white-space: nowrap;
 }
 
-.answer-button .latex-inline .katex {
-  font-size: 1.08em;
+.answer-button .katex-display {
+  margin: 0 !important;
+  text-align: left;
+}
+
+.answer-button,
+.answer-button * {
+  scrollbar-width: none !important;
+}
+
+.answer-button::-webkit-scrollbar,
+.answer-button *::-webkit-scrollbar {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
 }
 
 .answer-grid.long-options {
@@ -50,7 +75,8 @@
   min-height: 52px !important;
 }
 
-.answer-grid.long-options .latex-inline .katex {
+.answer-grid.long-options .latex-inline .katex,
+.answer-grid.long-options .latex-display .katex {
   font-size: 1.04em;
 }
 
@@ -418,6 +444,11 @@
 
   .answer-button > span:last-child {
     font-size: 16px !important;
+  }
+
+  .answer-grid.long-options .latex-inline .katex,
+  .answer-grid.long-options .latex-display .katex {
+    font-size: .92em;
   }
 
   .compact-setup-layout {
