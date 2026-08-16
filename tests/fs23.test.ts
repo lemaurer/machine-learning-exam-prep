@@ -11,6 +11,10 @@ import { correctOptionIds, DISPLAY_OPTION_IDS, isCorrectSelection } from "../lib
 import { inferFigureNumber } from "../lib/question-edits";
 import { questionsForExam } from "../lib/question-selection";
 
+test("exam selector is ordered chronologically from newest to oldest", () => {
+  assert.deepEqual(EXAMS.map((exam) => exam.id), ["HS25", "FS25", "HS24", "FS24", "HS23", "FS23"]);
+});
+
 test("FS23 contains all 45 supplied questions in original order", () => {
   const fs23 = questionsForExam(questions, "FS23");
   assert.equal(fs23.length, 45);
