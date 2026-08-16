@@ -10,7 +10,13 @@ import {
   shouldIgnoreAnswerShortcut,
   shuffledOptionIds,
 } from "../lib/answers";
-import { applyQuestionEditWithCommonSetup, inferCommonSetupQuestionIds, inferFigureNumber, removeQuestionEditFromCommonSetup } from "../lib/question-edits";
+import {
+  applyQuestionEditWithCommonSetup,
+  applySharedFigureImage,
+  inferCommonSetupQuestionIds,
+  inferFigureNumber,
+  removeQuestionEditFromCommonSetup,
+} from "../lib/question-edits";
 import { answerProgress, applyEdits, setQuestionStatus } from "../lib/progress";
 import { questionsAvailableForMode, questionsForExam, shuffleQuestionsBySetupGroup, uniqueQuestionsById } from "../lib/question-selection";
 import type { ProgressStore } from "../types/question";
@@ -166,6 +172,23 @@ test("figures are identified by number and an edit propagates to every question 
     assert.equal(updated.figureAlt, "Updated shared Figure 1");
     assert.equal(updated.figureCaption, "Updated shared Figure 1 caption");
   }
+});
+
+test("direct placeholder upload applies the image to every use of that figure number", () => {
+  const figureFourQuestions = questions.filter((question) => inferFigureNumber(question) === 4);
+  assert.deepEqual(figureFourQuestions.map((question) => question.number), [16, 17]);
+
+  const uploadedFigure = "data:image/webp;base64,shared-figure-four";
+  const edits = applySharedFigureImage({}, figureFourQuestions[0]!, questions, uploadedFigure);
+
+  for (const question of figureFourQuestions) {
+    const updated = applyEdits(question, edits[question.id]);
+    assert.equal(updated.figureNumber, 4);
+    assert.equal(updated.figure, uploadedFigure);
+  }
+
+  const figureFive = questions.find((question) => inferFigureNumber(question) === 5)!;
+  assert.equal(edits[figureFive.id], undefined);
 });
 
 test("progress stores multiple selected answers", () => {
