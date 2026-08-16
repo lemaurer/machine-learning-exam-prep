@@ -2,7 +2,7 @@ import type { Question, QuestionOption } from "../types/question";
 
 export type OptionId = QuestionOption["id"];
 
-export const DISPLAY_OPTION_IDS: OptionId[] = ["A", "B", "C", "D", "E", "F"];
+export const DISPLAY_OPTION_IDS: OptionId[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
 
 export function correctOptionIds(question: Question): OptionId[] {
   return question.correctOptionIds?.length ? question.correctOptionIds : [question.correctOptionId];
@@ -50,7 +50,7 @@ function protectedDisplayedLabel(optionId: OptionId, optionOrder: OptionId[]) {
 }
 
 function remapLetterList(value: string, optionOrder: OptionId[]) {
-  return value.replace(/[A-F]/g, (letter) => protectedDisplayedLabel(letter as OptionId, optionOrder));
+  return value.replace(/[A-I]/g, (letter) => protectedDisplayedLabel(letter as OptionId, optionOrder));
 }
 
 function restoreProtectedLabels(value: string) {
@@ -61,40 +61,31 @@ function restoreProtectedLabels(value: string) {
 function remapSolutionTextChunk(text: string, optionOrder: OptionId[]) {
   let result = text;
 
-  // Explicit option-reference markup. This is the safest convention for edited
-  // solutions: [[C]] or [[A, B]] always means answer-option IDs, never a math label.
   result = result.replace(
-    /\[\[\s*([A-F](?:\s*(?:(?:,|\/|&|\+)\s*|\s+and\s+)[A-F])*)\s*\]\]/gi,
+    /\[\[\s*([A-I](?:\s*(?:(?:,|\/|&|\+)\s*|\s+and\s+)[A-I])*)\s*\]\]/gi,
     (_match, ids: string) => remapLetterList(ids, optionOrder),
   );
 
-  // Natural-language answer references such as "Option C", "Answer: B", or
-  // "Correct answers A and B". We deliberately do not replace arbitrary A-F
-  // letters so labels such as "Plot B" remain stable.
   result = result.replace(
-    /\b((?:correct\s+)?(?:answer|answers|option|options|choice|choices)\s*(?::|=|is|are)?\s*)([A-F](?:\s*(?:(?:,|\/|&|\+)\s*|\s+and\s+)[A-F])*)\b/gi,
+    /\b((?:correct\s+)?(?:answer|answers|option|options|choice|choices)\s*(?::|=|is|are)?\s*)([A-I](?:\s*(?:(?:,|\/|&|\+)\s*|\s+and\s+)[A-I])*)\b/gi,
     (_match, prefix: string, ids: string) => `${prefix}${remapLetterList(ids, optionOrder)}`,
   );
 
-  // Standard solution keys often begin with "C.", "C)", "C:" or "(C)".
   result = result.replace(
-    /^(\s*)\(([A-F])\)(?=\s|$)/i,
+    /^(\s*)\(([A-I])\)(?=\s|$)/i,
     (_match, whitespace: string, id: string) => `${whitespace}(${protectedDisplayedLabel(id.toUpperCase() as OptionId, optionOrder)})`,
   );
   result = result.replace(
-    /^(\s*)([A-F])(?=\s*[.):\-]\s)/i,
+    /^(\s*)([A-I])(?=\s*[.):\-]\s)/i,
     (_match, whitespace: string, id: string) => `${whitespace}${protectedDisplayedLabel(id.toUpperCase() as OptionId, optionOrder)}`,
   );
 
-  // "B is correct" / "A and C are the correct answers" is unambiguous enough
-  // outside LaTeX and lets normal prose solutions follow the shuffled labels.
   result = result.replace(
-    /\b([A-F](?:\s*(?:(?:,|&|\+)\s*|\s+and\s+)[A-F])*)\s+(is|are)\s+(the\s+)?correct(?=\b)/gi,
+    /\b([A-I](?:\s*(?:(?:,|&|\+)\s*|\s+and\s+)[A-I])*)\s+(is|are)\s+(the\s+)?correct(?=\b)/gi,
     (_match, ids: string, verb: string, article: string | undefined) => `${remapLetterList(ids, optionOrder)} ${verb} ${article ?? ""}correct`,
   );
 
-  // If the whole solution is just an answer key such as "C" or "A, B", map it.
-  if (/^\s*[A-F](?:\s*(?:(?:,|\/|&|\+)\s*|\s+and\s+)[A-F])*\s*$/i.test(result)) {
+  if (/^\s*[A-I](?:\s*(?:(?:,|\/|&|\+)\s*|\s+and\s+)[A-I])*\s*$/i.test(result)) {
     result = remapLetterList(result, optionOrder);
   }
 
@@ -102,7 +93,7 @@ function remapSolutionTextChunk(text: string, optionOrder: OptionId[]) {
 }
 
 /**
- * Rewrites only answer-option references in a solution from the source A-F IDs
+ * Rewrites only answer-option references in a solution from the source A-I IDs
  * to the letters currently shown after shuffling. LaTeX spans are protected so
  * mathematical labels such as $A$, $B$, and $C$ are never rewritten.
  */
