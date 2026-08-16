@@ -37,8 +37,100 @@ function renderQuestionHeadingMath() {
   });
 }
 
-const headingObserver = new MutationObserver(renderQuestionHeadingMath);
-headingObserver.observe(document.body, { childList: true, subtree: true });
+let answerLayoutFrame = 0;
+
+function getAnswerMeasureRoot() {
+  let measureRoot = document.getElementById("answer-measure-root");
+  if (!measureRoot) {
+    measureRoot = document.createElement("div");
+    measureRoot.id = "answer-measure-root";
+    measureRoot.setAttribute("aria-hidden", "true");
+    document.body.appendChild(measureRoot);
+  }
+  return measureRoot;
+}
+
+function measureNaturalAnswerWidth(button: HTMLButtonElement) {
+  const clone = button.cloneNode(true) as HTMLButtonElement;
+  clone.classList.add("answer-measure");
+  clone.removeAttribute("disabled");
+  getAnswerMeasureRoot().appendChild(clone);
+  const width = clone.getBoundingClientRect().width;
+  clone.remove();
+  return width;
+}
+
+function classifyAnswerGrid(grid: HTMLElement) {
+  const buttons = Array.from(grid.querySelectorAll<HTMLButtonElement>(":scope > .answer-button"));
+  if (!buttons.length) return;
+
+  grid.classList.remove("answer-layout-compact", "answer-layout-balanced", "answer-layout-stacked");
+  grid.style.removeProperty("--answer-columns");
+  grid.style.setProperty("--answer-fit-scale", "1");
+
+  const gridWidth = grid.getBoundingClientRect().width;
+  if (!gridWidth) return;
+
+  const naturalWidths = buttons.map(measureNaturalAnswerWidth);
+  const maxNaturalWidth = Math.max(...naturalWidths);
+  const maxTextLength = Math.max(...buttons.map((button) => {
+    const content = button.querySelector<HTMLElement>(":scope > span:last-child");
+    return (content?.textContent ?? "").trim().length;
+  }));
+  const hasDisplayMath = buttons.some((button) => Boolean(button.querySelector(".latex-display, .katex-display")));
+
+  const gap = 8;
+  const compactColumns = buttons.length <= 4 ? buttons.length : buttons.length <= 6 ? 3 : 2;
+  const compactColumnWidth = (gridWidth - gap * (compactColumns - 1)) / compactColumns;
+  const balancedColumnWidth = (gridWidth - gap) / 2;
+  const desktop = window.innerWidth > 850;
+
+  const canUseCompact = desktop
+    && !hasDisplayMath
+    && maxTextLength <= 32
+    && maxNaturalWidth <= compactColumnWidth;
+  const canUseBalanced = desktop
+    && !hasDisplayMath
+    && maxTextLength <= 82
+    && maxNaturalWidth <= balancedColumnWidth;
+
+  if (canUseCompact) {
+    grid.classList.add("answer-layout-compact");
+    grid.style.setProperty("--answer-columns", String(compactColumns));
+    return;
+  }
+
+  if (canUseBalanced) {
+    grid.classList.add("answer-layout-balanced");
+    return;
+  }
+
+  grid.classList.add("answer-layout-stacked");
+  const fitScale = Math.min(1, (gridWidth - 8) / maxNaturalWidth);
+  grid.style.setProperty("--answer-fit-scale", String(Math.max(0.62, fitScale)));
+}
+
+function adaptAnswerLayouts() {
+  document.querySelectorAll<HTMLElement>(".answer-grid").forEach(classifyAnswerGrid);
+}
+
+function schedulePresentationPass() {
+  window.cancelAnimationFrame(answerLayoutFrame);
+  answerLayoutFrame = window.requestAnimationFrame(() => {
+    renderQuestionHeadingMath();
+    adaptAnswerLayouts();
+  });
+}
+
+const presentationObserver = new MutationObserver((mutations) => {
+  const hasRelevantMutation = mutations.some((mutation) => {
+    const target = mutation.target;
+    return !(target instanceof Element && target.closest("#answer-measure-root"));
+  });
+  if (hasRelevantMutation) schedulePresentationPass();
+});
+presentationObserver.observe(document.body, { childList: true, subtree: true });
+window.addEventListener("resize", schedulePresentationPass);
 
 /*
  * Practice multi-select questions submit through the same Enter-key path that
