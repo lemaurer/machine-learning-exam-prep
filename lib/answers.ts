@@ -40,8 +40,22 @@ export function displayedAnswerLabel(ids: OptionId[], optionOrder: OptionId[]) {
     .join(", ");
 }
 
+const REMAPPED_LABEL_START = "\uE000";
+const REMAPPED_LABEL_END = "\uE001";
+
+function protectedDisplayedLabel(optionId: OptionId, optionOrder: OptionId[]) {
+  const displayed = displayedOptionLabel(optionId, optionOrder);
+  const index = DISPLAY_OPTION_IDS.indexOf(displayed);
+  return `${REMAPPED_LABEL_START}${index}${REMAPPED_LABEL_END}`;
+}
+
 function remapLetterList(value: string, optionOrder: OptionId[]) {
-  return value.replace(/[A-F]/g, (letter) => displayedOptionLabel(letter as OptionId, optionOrder));
+  return value.replace(/[A-F]/gi, (letter) => protectedDisplayedLabel(letter.toUpperCase() as OptionId, optionOrder));
+}
+
+function restoreProtectedLabels(value: string) {
+  const pattern = new RegExp(`${REMAPPED_LABEL_START}(\\d)${REMAPPED_LABEL_END}`, "g");
+  return value.replace(pattern, (_match, index: string) => DISPLAY_OPTION_IDS[Number(index)] ?? "");
 }
 
 function remapSolutionTextChunk(text: string, optionOrder: OptionId[]) {
@@ -65,11 +79,11 @@ function remapSolutionTextChunk(text: string, optionOrder: OptionId[]) {
   // Standard solution keys often begin with "C.", "C)", "C:" or "(C)".
   result = result.replace(
     /^(\s*)\(([A-F])\)(?=\s|$)/i,
-    (_match, whitespace: string, id: string) => `${whitespace}(${displayedOptionLabel(id.toUpperCase() as OptionId, optionOrder)})`,
+    (_match, whitespace: string, id: string) => `${whitespace}(${protectedDisplayedLabel(id.toUpperCase() as OptionId, optionOrder)})`,
   );
   result = result.replace(
     /^(\s*)([A-F])(?=\s*[.):\-]\s)/i,
-    (_match, whitespace: string, id: string) => `${whitespace}${displayedOptionLabel(id.toUpperCase() as OptionId, optionOrder)}`,
+    (_match, whitespace: string, id: string) => `${whitespace}${protectedDisplayedLabel(id.toUpperCase() as OptionId, optionOrder)}`,
   );
 
   // "B is correct" / "A and C are the correct answers" is unambiguous enough
@@ -84,7 +98,7 @@ function remapSolutionTextChunk(text: string, optionOrder: OptionId[]) {
     result = remapLetterList(result, optionOrder);
   }
 
-  return result;
+  return restoreProtectedLabels(result);
 }
 
 /**
