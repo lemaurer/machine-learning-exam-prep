@@ -14,7 +14,7 @@ export type SessionMode = "practice" | "review" | "exam";
 export type QuestionStatus = "new" | "done" | "review";
 
 export type QuestionOption = {
-  id: "A" | "B" | "C" | "D" | "E" | "F";
+  id: "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I";
   text: string;
 };
 
