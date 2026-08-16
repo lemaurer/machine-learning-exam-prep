@@ -176,7 +176,7 @@ test("figures are identified by number and an edit propagates to every question 
 
 test("direct placeholder upload applies the image to every use of that figure number", () => {
   const figureFourQuestions = questions.filter((question) => inferFigureNumber(question) === 4);
-  assert.deepEqual(figureFourQuestions.map((question) => question.number), [16, 17]);
+  assert.deepEqual(figureFourQuestions.map((question) => question.number), [18, 19, 20]);
 
   const uploadedFigure = "data:image/webp;base64,shared-figure-four";
   const edits = applySharedFigureImage({}, figureFourQuestions[0]!, questions, uploadedFigure);
