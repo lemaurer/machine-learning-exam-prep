@@ -470,3 +470,137 @@
     padding: 22px 16px;
   }
 }
+
+/* Adaptive answer layout --------------------------------------------------
+   The client measures the rendered answer choices (including KaTeX) and adds
+   one of these classes. Short answers become dense and large; medium answers
+   keep two columns; wide formulas get the full question width. */
+#answer-measure-root {
+  height: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  visibility: hidden;
+  width: 0;
+  z-index: -1;
+}
+
+.answer-measure {
+  left: -100000px !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  pointer-events: none !important;
+  position: fixed !important;
+  top: -100000px !important;
+  visibility: hidden !important;
+  width: max-content !important;
+}
+
+.answer-measure > span:last-child {
+  font-size: 22px !important;
+  max-width: none !important;
+  overflow-wrap: normal !important;
+  white-space: nowrap !important;
+  width: max-content !important;
+}
+
+.answer-measure .latex-inline,
+.answer-measure .latex-display,
+.answer-measure .katex {
+  white-space: nowrap !important;
+}
+
+.answer-grid.answer-layout-compact {
+  gap: 8px !important;
+  grid-template-columns: repeat(var(--answer-columns, 3), minmax(0, 1fr)) !important;
+}
+
+.answer-grid.answer-layout-balanced {
+  gap: 8px !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.answer-grid.answer-layout-stacked {
+  gap: 8px !important;
+  grid-template-columns: 1fr !important;
+}
+
+.answer-grid.answer-layout-compact .answer-button,
+.answer-grid.answer-layout-balanced .answer-button,
+.answer-grid.answer-layout-stacked .answer-button {
+  align-items: center;
+  height: auto;
+  overflow: clip !important;
+}
+
+.answer-grid.answer-layout-compact .answer-button {
+  min-height: 52px !important;
+  padding: 7px 11px !important;
+}
+
+.answer-grid.answer-layout-balanced .answer-button {
+  min-height: 54px !important;
+  padding: 8px 12px !important;
+}
+
+.answer-grid.answer-layout-stacked .answer-button {
+  min-height: 56px !important;
+  padding: 9px 13px !important;
+}
+
+.answer-grid.answer-layout-compact .answer-button > span:last-child {
+  font-size: 22.5px !important;
+  line-height: 1.15 !important;
+}
+
+.answer-grid.answer-layout-balanced .answer-button > span:last-child {
+  font-size: 21.5px !important;
+  line-height: 1.18 !important;
+}
+
+.answer-grid.answer-layout-stacked .answer-button > span:last-child {
+  font-size: calc(22px * var(--answer-fit-scale, 1)) !important;
+  line-height: 1.2 !important;
+}
+
+.answer-grid.answer-layout-compact .katex,
+.answer-grid.answer-layout-balanced .katex,
+.answer-grid.answer-layout-stacked .katex {
+  font-size: 1.14em !important;
+}
+
+.answer-grid.answer-layout-compact .latex-inline,
+.answer-grid.answer-layout-compact .latex-display,
+.answer-grid.answer-layout-balanced .latex-inline,
+.answer-grid.answer-layout-balanced .latex-display,
+.answer-grid.answer-layout-stacked .latex-inline,
+.answer-grid.answer-layout-stacked .latex-display {
+  overflow: visible !important;
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+  white-space: normal !important;
+}
+
+@media (max-width: 850px) {
+  .answer-grid.answer-layout-compact,
+  .answer-grid.answer-layout-balanced,
+  .answer-grid.answer-layout-stacked {
+    grid-template-columns: 1fr !important;
+  }
+
+  .answer-grid.answer-layout-compact .answer-button > span:last-child,
+  .answer-grid.answer-layout-balanced .answer-button > span:last-child,
+  .answer-grid.answer-layout-stacked .answer-button > span:last-child {
+    font-size: 19.5px !important;
+    line-height: 1.2 !important;
+  }
+
+  .answer-grid.answer-layout-compact .katex,
+  .answer-grid.answer-layout-balanced .katex,
+  .answer-grid.answer-layout-stacked .katex {
+    font-size: 1.12em !important;
+  }
+}
