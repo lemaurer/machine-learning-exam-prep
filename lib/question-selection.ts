@@ -13,7 +13,9 @@ export function uniqueQuestionsById(questions: Question[]) {
   const seenIds = new Set<string>();
   const seenPrompts = new Set<string>();
   return questions.filter((question) => {
-    const prompt = normalizedPrompt(question.prompt);
+    // Identical wording is valid across different exams. Only suppress a
+    // repeated prompt when it occurs inside the same exam bank.
+    const prompt = `${question.examId}::${normalizedPrompt(question.prompt)}`;
     if (seenIds.has(question.id) || seenPrompts.has(prompt)) return false;
     seenIds.add(question.id);
     seenPrompts.add(prompt);
