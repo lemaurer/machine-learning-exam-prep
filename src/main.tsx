@@ -7,6 +7,7 @@ import "../data/hs25-additions";
 import "../data/hs24-additions";
 import "../data/fs25-additions";
 import "../data/fs24-additions";
+import "../data/hs23-additions";
 import { ExamPrepApp } from "../app/ExamPrepApp";
 import "../app/session-tight.css";
 
@@ -17,8 +18,7 @@ if (!root) throw new Error("Missing application root.");
 /*
  * Question prompts already use the React LatexText component. Question titles
  * are plain text in the current screen component, so render any inline $...$
- * fragments in those headings with the same KaTeX engine. This keeps titles
- * such as "CNN filter $F_3$" visually consistent with the exam body.
+ * fragments in those headings with the same KaTeX engine.
  */
 function renderQuestionHeadingMath() {
   document.querySelectorAll<HTMLElement>(".exam-heading h1").forEach((heading) => {
@@ -136,12 +136,7 @@ const presentationObserver = new MutationObserver((mutations) => {
 presentationObserver.observe(document.body, { childList: true, subtree: true });
 window.addEventListener("resize", schedulePresentationPass);
 
-/*
- * Practice multi-select questions submit through the same Enter-key path that
- * already submits the current selection correctly. The React button currently
- * forwards its MouseEvent into the optional answerIds argument, so intercept
- * only that specific practice control and trigger the no-argument submit path.
- */
+/* Multi-select practice submit fix. */
 document.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -154,6 +149,26 @@ document.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+}, true);
+
+/*
+ * HS23 contains questions with G-I choices. The React shortcut handler predates
+ * those exams and handles A-F, so map G-I to the visible answer button here.
+ * Modified shortcuts remain untouched, preserving normal browser shortcuts.
+ */
+document.addEventListener("keydown", (event) => {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return;
+  const target = event.target as HTMLElement | null;
+  if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+  const key = event.key.toUpperCase();
+  if (!/^[G-I]$/.test(key)) return;
+
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>(".answer-grid > .answer-button"))
+    .find((candidate) => candidate.querySelector("kbd")?.textContent?.trim().toUpperCase() === key);
+  if (!button || button.disabled) return;
+  event.preventDefault();
+  event.stopPropagation();
+  button.click();
 }, true);
 
 createRoot(root).render(
