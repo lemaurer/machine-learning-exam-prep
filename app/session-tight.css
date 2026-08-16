@@ -1,0 +1,62 @@
+/* Compact session framing -------------------------------------------------
+   Keep the actual exam content readable while removing the large decorative
+   whitespace around the toolbar, progress indicator, and question header. */
+.session-page {
+  padding: 20px 24px 56px !important;
+}
+
+.session-toolbar {
+  align-items: center !important;
+}
+
+.session-toolbar strong {
+  margin-top: 3px !important;
+}
+
+.progress-track {
+  margin: 12px 0 16px !important;
+}
+
+.question-card {
+  min-height: 0 !important;
+  padding: 24px clamp(26px, 4vw, 48px) 38px !important;
+}
+
+.question-meta {
+  padding-bottom: 9px !important;
+}
+
+.exam-heading {
+  margin: 20px 0 18px !important;
+}
+
+.question-setup {
+  margin-bottom: 18px !important;
+}
+
+.prompt {
+  margin-bottom: 24px !important;
+}
+
+.question-card figure {
+  margin-top: 16px !important;
+  margin-bottom: 22px !important;
+}
+
+@media (max-width: 850px) {
+  .session-page {
+    padding: 14px 12px 40px !important;
+  }
+
+  .progress-track {
+    margin: 10px 0 13px !important;
+  }
+
+  .question-card {
+    padding: 20px 16px 30px !important;
+  }
+
+  .exam-heading {
+    margin: 17px 0 15px !important;
+  }
+}
