@@ -20,6 +20,13 @@ export function inferFigureNumber(question: Question) {
   return undefined;
 }
 
+export function inferFigureNumbers(question: Question) {
+  return [...new Set([
+    inferFigureNumber(question),
+    validFigureNumber(question.secondFigureNumber) ? question.secondFigureNumber : undefined,
+  ].filter((value): value is number => typeof value === "number"))];
+}
+
 export function inferCommonSetupQuestionIds(
   question: Question,
   questions: Question[],
@@ -41,28 +48,42 @@ export function applySharedFigureImage(
   question: Question,
   questions: Question[],
   figure: string,
+  explicitFigureNumber?: number,
 ) {
-  const figureNumber = inferFigureNumber(question);
-  if (!figureNumber) return current;
+  const figureNumber = explicitFigureNumber ?? inferFigureNumber(question);
+  if (!validFigureNumber(figureNumber)) return current;
 
   const members = questions.filter(
-    (candidate) => candidate.examId === question.examId && inferFigureNumber(candidate) === figureNumber,
+    (candidate) => candidate.examId === question.examId && inferFigureNumbers(candidate).includes(figureNumber),
   );
   const memberIds = uniqueIds([question.id, ...members.map((candidate) => candidate.id)]);
   const sharedFigureQuestionIds = memberIds.length > 1 ? memberIds : undefined;
   const next: EditStore = { ...current };
-  const figureAlt = question.figureAlt ?? `Figure ${figureNumber}`;
-  const figureCaption = question.figureCaption;
 
   for (const memberId of memberIds) {
-    next[memberId] = {
-      ...(current[memberId] ?? {}),
-      figureNumber,
-      figure,
-      figureAlt,
-      figureCaption,
-      sharedFigureQuestionIds,
-    };
+    const member = questions.find((candidate) => candidate.id === memberId) ?? question;
+    const existing = current[memberId] ?? {};
+    const isSecondSlot = member.secondFigureNumber === figureNumber;
+
+    if (isSecondSlot) {
+      next[memberId] = {
+        ...existing,
+        secondFigureNumber: figureNumber,
+        secondFigure: figure,
+        secondFigureAlt: member.secondFigureAlt ?? `Figure ${figureNumber}`,
+        secondFigureCaption: member.secondFigureCaption,
+        sharedFigureQuestionIds,
+      };
+    } else {
+      next[memberId] = {
+        ...existing,
+        figureNumber,
+        figure,
+        figureAlt: member.figureAlt ?? `Figure ${figureNumber}`,
+        figureCaption: member.figureCaption,
+        sharedFigureQuestionIds,
+      };
+    }
   }
 
   return next;
