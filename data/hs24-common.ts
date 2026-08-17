@@ -5,14 +5,16 @@ export const EXAM_ID = "HS24";
 export const EXAM_LABEL = "HS24 · January 2025";
 export const opts = (...items: Array<[OptionId, string]>): QuestionOption[] => items.map(([id, text]) => ({ id, text }));
 
-export function q({ number, points, title, prompt, options, correct, topic, difficulty, setup, multipleSelect = false, figureNumber, figureAlt, figureCaption, explanation }: {
+export function q({ number, points, title, prompt, options, correct, topic, difficulty, setup, multipleSelect = false, figureNumber, figureAlt, figureCaption, secondFigureNumber, secondFigureAlt, secondFigureCaption, explanation }: {
   number: number; points: number; title: string; prompt: string; options: QuestionOption[]; correct: OptionId[];
-  topic: Topic; difficulty: Difficulty; setup?: string; multipleSelect?: boolean; figureNumber?: number; figureAlt?: string; figureCaption?: string; explanation: string;
+  topic: Topic; difficulty: Difficulty; setup?: string; multipleSelect?: boolean; figureNumber?: number; figureAlt?: string; figureCaption?: string;
+  secondFigureNumber?: number; secondFigureAlt?: string; secondFigureCaption?: string; explanation: string;
 }): Question {
   return {
     id: `hs24-q${String(number).padStart(2, "0")}`, examId: EXAM_ID, examLabel: EXAM_LABEL, number, title, setup, prompt, options,
     correctOptionId: correct[0], correctOptionIds: correct, multipleSelect, explanation, topic, difficulty,
     source: `HS24 · Question ${number} · ${points} point${points === 1 ? "" : "s"}`, figureNumber, figureAlt, figureCaption,
+    secondFigureNumber, secondFigureAlt, secondFigureCaption,
   };
 }
 
@@ -24,7 +26,7 @@ export const NN_SETUP = "Consider a neural network with one hidden layer, shown 
 export const ALEXNET_SETUP = "AlexNet competed in the ImageNet Large Scale Visual Recognition Challenge on September 30, 2012 and achieved a top-5 error of 15.3%. Its inputs are images of size $227\\times227\\times3$ (height $\\times$ width $\\times$ channel). The first layer is a convolutional layer with 96 filters of size $11\\times11\\times3$, stride 4, no padding, and bias parameters.";
 export const REG_SETUP = "Assume a training dataset $\\mathcal{D}=\\{(x_i,y_i)\\}_{i=1}^n$ with $n>d$ satisfies\n$$y_i=x_i^\\top w^\\star+\\varepsilon_i,\\qquad i=1,\\ldots,n,$$\nwhere $w^\\star\\in\\mathbb{R}^d$ is unknown and the noise variables are i.i.d. with $\\mathbb{E}[\\varepsilon_i]=0$ and $\\operatorname{Var}(\\varepsilon_i)=\\sigma^2$. Let $y=Xw^\\star+\\varepsilon$ with full-rank $X\\in\\mathbb{R}^{n\\times d}$. Define\n$$\\hat w_{\\mathrm{ls}}:=\\arg\\min_w \\frac12\\|y-Xw\\|_2^2,$$\n$$\\hat w_{\\mathrm{lasso}}(\\lambda):=\\arg\\min_w \\frac12\\|y-Xw\\|_2^2+\\lambda\\|w\\|_1,\\qquad \\lambda>0,$$\n$$\\hat w_{\\mathrm{ridge}}(\\lambda):=\\arg\\min_w \\frac12\\|y-Xw\\|_2^2+\\frac{\\lambda}{2}\\|w\\|_2^2,\\qquad \\lambda>0.$$\nFor an estimator $\\hat w$,\n$$\\operatorname{Bias}(\\hat w)=\\|w^\\star-\\mathbb{E}_\\varepsilon[\\hat w]\\|_2,\\qquad\n\\operatorname{Var}(\\hat w)=\\mathbb{E}_\\varepsilon\\left[\\|\\hat w-\\mathbb{E}_\\varepsilon[\\hat w]\\|_2^2\\right].$$";
 export const PCA_SETUP = "Consider the data matrix of $n=3$ observations\n$$X=\\begin{pmatrix}-1&1\\\\2&1\\\\2&4\\end{pmatrix}.$$\nWe apply PCA to reduce the dimensionality.";
-export const LLOYD_SETUP = "We apply Lloyd's algorithm with $k=2$ to the two-dimensional dataset shown in the source Figure 1, where each point has coordinates $(x_1\\ \\ x_2)^\\top$. The figure placeholder for this question is intended for a combined image containing source Figure 1 and the four candidate cluster-assignment plots from source Figure 2.";
+export const LLOYD_SETUP = "We apply Lloyd's algorithm with $k=2$ to the two-dimensional dataset shown in Figure 1, where each point has coordinates $(x_1\\ \\ x_2)^\\top$. Figure 2 shows the four candidate cluster assignments after termination.";
 export const GAUSSIAN_SETUP = "Assume one-dimensional data points $\\mathcal{D}=\\{x_i\\}_{i=1}^n$ are i.i.d. samples from a Gaussian distribution $\\mathcal{N}(\\mu,\\sigma^2)$ with mean $\\mu$ and standard deviation $\\sigma$.";
 export const DISCRETE_SETUP = "For the following question, use the concrete dataset\n$$\\mathcal{D}=\\{x_i\\}_{i=1}^5=\\{2,1,2,3,1\\}.$$";
 export const EM_SETUP = "Not every individual responds to a new drug as intended. Patients are modeled as responders or non-responders according to a nonnegative biomarker concentration $x_i>0$. Let $z_i\\in\\{0,1\\}$ denote the latent group and\n$$p(z_i=1)=q,\\qquad q\\in[0,1].$$\nConditional on $z_i$, model the biomarker by\n$$p(x_i\\mid z_i)=\\beta_{z_i}^2x_i\\exp(-\\beta_{z_i}x_i),\\qquad \\beta_{z_i}>0.$$\nWe apply soft EM to infer $\\theta=\\{q,\\beta_0,\\beta_1\\}$ and the posterior group probabilities $p(z_i\\mid x_i;\\theta)$.";
