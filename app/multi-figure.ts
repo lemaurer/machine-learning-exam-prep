@@ -22,6 +22,10 @@ function effectiveQuestion(question: Question): Question {
   return { ...question, ...fields };
 }
 
+function displayedFigureLabel(caption: string | undefined, figureNumber: number) {
+  return caption?.match(/^\s*(Figure\s+\d+)/i)?.[1] ?? `Figure ${figureNumber}`;
+}
+
 function captionElement(text?: string) {
   if (!text) return undefined;
   const caption = document.createElement("figcaption");
@@ -29,10 +33,18 @@ function captionElement(text?: string) {
   return caption;
 }
 
+function relabelPrimaryPlaceholder(card: HTMLElement, question: Question) {
+  if (!question.figureNumber) return;
+  const label = card.querySelector<HTMLElement>(":scope > .figure-placeholder-shell:not(.secondary-figure-slot) .figure-dropzone-number");
+  if (label) label.textContent = displayedFigureLabel(question.figureCaption, question.figureNumber);
+}
+
 function renderSecondFigure(card: HTMLElement, sourceQuestion: Question) {
   const question = effectiveQuestion(sourceQuestion);
   const figureNumber = question.secondFigureNumber;
   if (!figureNumber) return;
+
+  relabelPrimaryPlaceholder(card, question);
 
   const existing = card.querySelector<HTMLElement>(`:scope > [data-secondary-figure="${figureNumber}"]`);
   if (existing) return;
@@ -44,7 +56,7 @@ function renderSecondFigure(card: HTMLElement, sourceQuestion: Question) {
   if (question.secondFigure) {
     const image = document.createElement("img");
     image.src = resolveAssetUrl(question.secondFigure);
-    image.alt = question.secondFigureAlt ?? `Figure ${figureNumber}`;
+    image.alt = question.secondFigureAlt ?? displayedFigureLabel(question.secondFigureCaption, figureNumber);
     shell.appendChild(image);
     const caption = captionElement(question.secondFigureCaption);
     if (caption) shell.appendChild(caption);
@@ -58,7 +70,7 @@ function renderSecondFigure(card: HTMLElement, sourceQuestion: Question) {
 
     const numberLabel = document.createElement("span");
     numberLabel.className = "figure-dropzone-number";
-    numberLabel.textContent = `Figure ${figureNumber}`;
+    numberLabel.textContent = displayedFigureLabel(question.secondFigureCaption, figureNumber);
     const strong = document.createElement("strong");
     strong.textContent = "Drop an image here";
     const small = document.createElement("small");
