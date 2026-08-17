@@ -10,6 +10,7 @@ import "../data/fs24-additions";
 import "../data/hs23-additions";
 import "../data/fs23-additions";
 import { ExamPrepApp } from "../app/ExamPrepApp";
+import { installMultiFigureSupport } from "../app/multi-figure";
 import "../app/session-tight.css";
 
 const root = document.getElementById("root");
@@ -171,6 +172,8 @@ document.addEventListener("keydown", (event) => {
   event.stopPropagation();
   button.click();
 }, true);
+
+installMultiFigureSupport();
 
 createRoot(root).render(
   <StrictMode>
