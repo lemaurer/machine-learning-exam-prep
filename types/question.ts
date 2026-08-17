@@ -38,6 +38,10 @@ export type Question = {
   figure?: string;
   figureAlt?: string;
   figureCaption?: string;
+  secondFigureNumber?: number;
+  secondFigure?: string;
+  secondFigureAlt?: string;
+  secondFigureCaption?: string;
 };
 
 export type QuestionProgress = {
@@ -54,7 +58,7 @@ export type ProgressStore = Record<string, QuestionProgress>;
 export type QuestionEdit = Partial<
   Pick<
     Question,
-    "setup" | "prompt" | "options" | "correctOptionId" | "correctOptionIds" | "multipleSelect" | "explanation" | "topic" | "difficulty" | "figureNumber" | "figure" | "figureAlt" | "figureCaption"
+    "setup" | "prompt" | "options" | "correctOptionId" | "correctOptionIds" | "multipleSelect" | "explanation" | "topic" | "difficulty" | "figureNumber" | "figure" | "figureAlt" | "figureCaption" | "secondFigureNumber" | "secondFigure" | "secondFigureAlt" | "secondFigureCaption"
   >
 > & {
   commonSetupQuestionIds?: string[];
