@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { EXAMS, questions as sourceQuestions } from "../data/questions";
 import {
   answerProgress,
+  markLatestAttemptCorrect,
   applyEdits,
   EDITS_KEY,
   loadEdits,
@@ -109,6 +110,7 @@ export function ExamPrepApp() {
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [sessionAnswers, setSessionAnswers] = useState<SessionAnswer[]>([]);
   const [editing, setEditing] = useState(false);
+  const [manuallyCorrectedIds, setManuallyCorrectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     const knownIds = new Set(sourceQuestions.map((question) => question.id));
@@ -202,6 +204,7 @@ export function ExamPrepApp() {
     setDisplayedOptionIds(shuffledOptionIds(selected[0]));
     setFeedbackVisible(false);
     setSessionAnswers([]);
+    setManuallyCorrectedIds([]);
     setEditing(false);
     setScreen("session");
   }
@@ -285,6 +288,26 @@ export function ExamPrepApp() {
 
   function markDone(questionId: string) {
     persistProgress((current) => ({ ...current, [questionId]: setQuestionStatus(current[questionId], "done") }));
+  }
+
+  function markCurrentAnswerCorrect() {
+    if (!currentQuestion || !feedbackVisible || mode === "exam") return;
+
+    setSessionAnswers((answers) => {
+      const next = [...answers];
+      for (let index = next.length - 1; index >= 0; index -= 1) {
+        if (next[index].questionId === currentQuestion.id && !next[index].correct) {
+          next[index] = { ...next[index], correct: true };
+          break;
+        }
+      }
+      return next;
+    });
+    setManuallyCorrectedIds((ids) => ids.includes(currentQuestion.id) ? ids : [...ids, currentQuestion.id]);
+    persistProgress((current) => {
+      const corrected = markLatestAttemptCorrect(current[currentQuestion.id]);
+      return corrected ? { ...current, [currentQuestion.id]: corrected } : current;
+    });
   }
 
   function saveQuestionEdit(questionId: string, edit: QuestionEdit, commonSetupQuestionIds: string[]) {
@@ -428,6 +451,7 @@ export function ExamPrepApp() {
           feedbackVisible={feedbackVisible}
           showProgressBar={mode !== "exam" || examSettings.showProgressBar}
           status={progress[currentQuestion.id]?.status ?? "new"}
+          manuallyCorrected={manuallyCorrectedIds.includes(currentQuestion.id)}
           onChoose={chooseAnswer}
           onSubmit={mode === "exam" ? commitExamAnswer : submitPracticeAnswer}
           onNext={() => advance(true)}
@@ -435,6 +459,7 @@ export function ExamPrepApp() {
           onEdit={() => setEditing(true)}
           onEnd={endSession}
           onQueueReview={() => queueForReview(currentQuestion.id)}
+          onMarkCorrect={markCurrentAnswerCorrect}
           onFigureUpload={(figure) => saveFigureImage(currentQuestion, figure)}
         />
       )}
@@ -676,6 +701,7 @@ function SessionScreen({
   feedbackVisible,
   showProgressBar,
   status,
+  manuallyCorrected,
   onChoose,
   onSubmit,
   onNext,
@@ -683,6 +709,7 @@ function SessionScreen({
   onEdit,
   onEnd,
   onQueueReview,
+  onMarkCorrect,
   onFigureUpload,
 }: {
   mode: SessionMode;
@@ -694,6 +721,7 @@ function SessionScreen({
   feedbackVisible: boolean;
   showProgressBar: boolean;
   status: "new" | "done" | "review";
+  manuallyCorrected: boolean;
   onChoose: (id: QuestionOption["id"]) => void;
   onSubmit: () => void;
   onNext: () => void;
@@ -701,10 +729,11 @@ function SessionScreen({
   onEdit: () => void;
   onEnd: () => void;
   onQueueReview: () => void;
+  onMarkCorrect: () => void;
   onFigureUpload: (figure: string) => void;
 }) {
   const expectedIds = correctOptionIds(question);
-  const isCorrect = feedbackVisible && isCorrectSelection(question, selectedIds);
+  const isCorrect = feedbackVisible && (manuallyCorrected || isCorrectSelection(question, selectedIds));
   const optionOrder = displayedOptionIds.length === question.options.length
     ? displayedOptionIds
     : question.options.map((option) => option.id);
@@ -777,7 +806,7 @@ function SessionScreen({
         {feedbackVisible && (
           <div className={`feedback ${isCorrect ? "correct" : "incorrect"}`} role="status">
             <div className="feedback-icon">{isCorrect ? "✓" : "×"}</div>
-            <div><strong>{isCorrect ? "Correct" : `Incorrect · Correct answer${expectedIds.length > 1 ? "s" : ""}: ${expectedLabel}`}</strong><p><LatexText text={remapSolutionOptionReferences(question.explanation, optionOrder)} /></p><small>{question.source}</small></div>
+            <div><strong>{manuallyCorrected ? "Marked correct manually" : isCorrect ? "Correct" : `Incorrect · Correct answer${expectedIds.length > 1 ? "s" : ""}: ${expectedLabel}`}</strong><p><LatexText text={remapSolutionOptionReferences(question.explanation, optionOrder)} /></p><small>{question.source}</small></div>
           </div>
         )}
 
@@ -786,7 +815,13 @@ function SessionScreen({
         )}
 
         {feedbackVisible && mode !== "exam" && (
-          <div className="next-row"><div>{!isCorrect || status === "review" ? <span>Saved in Review</span> : mode === "review" ? <span>Cleared from Review</span> : <button className="secondary-button compact" onClick={onQueueReview}>Save to Review for later</button>}</div><button className="primary-button compact" onClick={onNext}>{index + 1 === total ? "See session review" : "Next question"}<span>→</span></button></div>
+          <div className="next-row">
+            <div className="session-actions">
+              {!isCorrect && <button className="secondary-button compact" onClick={onMarkCorrect}>Mark as correct</button>}
+              {status === "review" ? <span>Saved in Review</span> : <button className="secondary-button compact" onClick={onQueueReview}>Save to Review for later</button>}
+            </div>
+            <button className="primary-button compact" onClick={onNext}>{index + 1 === total ? "See session review" : "Next question"}<span>→</span></button>
+          </div>
         )}
       </article>
     </div>
