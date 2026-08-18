@@ -61,6 +61,16 @@ export function answerProgress(
   };
 }
 
+export function markLatestAttemptCorrect(previous: QuestionProgress | undefined): QuestionProgress | undefined {
+  if (!previous || previous.incorrect <= 0) return previous;
+  return {
+    ...previous,
+    status: "done",
+    correct: previous.correct + 1,
+    incorrect: previous.incorrect - 1,
+  };
+}
+
 export function setQuestionStatus(
   previous: QuestionProgress | undefined,
   status: QuestionProgress["status"],
