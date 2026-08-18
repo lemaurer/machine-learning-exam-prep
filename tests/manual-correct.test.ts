@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { answerProgress, markLatestAttemptCorrect, setQuestionStatus } from "../lib/progress";
 
+// Regression coverage for correcting a mis-click while still allowing Review.
 test("manual correction converts the latest incorrect attempt into a correct attempt", () => {
   const wrong = answerProgress(undefined, "A", false, new Date("2026-08-18T12:00:00Z"));
   const corrected = markLatestAttemptCorrect(wrong)!;
