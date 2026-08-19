@@ -110,6 +110,6 @@ test("HS21 source anchors guard against accidental transcription gaps", () => {
   assert.match(exam.find((question) => question.number === 12)?.prompt ?? "", /maximum margin/);
   assert.equal(exam.find((question) => question.number === 15)?.options.length, 8);
   assert.match(exam.find((question) => question.number === 38)?.prompt ?? "", /overestimation errors of the predictor are less critical than underestimation errors/);
-  assert.match(exam.find((question) => question.number === 47)?.prompt ?? "", /what is \$D\^\*\(x\)\?/);
+  assert.match(exam.find((question) => question.number === 47)?.prompt ?? "", /what is \$D\^\*\(x\)\$\?/);
   assert.equal(exam.find((question) => question.number === 50)?.prompt.endsWith("Decision Trees."), true);
 });
