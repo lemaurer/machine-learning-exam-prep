@@ -1,7 +1,7 @@
 import { questions } from "../data/questions";
 import { EDITS_KEY, loadEdits, saveEdits } from "../lib/progress";
 import { inferFigureNumber } from "../lib/question-edits";
-import { loadImageFile } from "../lib/images";
+import { loadImageFile, resolveStoredImageSource } from "../lib/images";
 import { resolveAssetUrl } from "../lib/assets";
 import type { Question } from "../types/question";
 
@@ -36,6 +36,15 @@ function captionElement(text?: string) {
   const caption = document.createElement("figcaption");
   caption.textContent = text;
   return caption;
+}
+
+function useImageSource(image: HTMLImageElement, source: string) {
+  void resolveStoredImageSource(source)
+    .then((resolved) => {
+      if (!resolved || !image.isConnected) return;
+      image.src = resolveAssetUrl(resolved) ?? resolved;
+    })
+    .catch((error) => console.error("Could not restore figure image.", error));
 }
 
 function saveSecondFigure(question: Question, figure: string) {
@@ -76,9 +85,9 @@ function renderSecondFigure(card: HTMLElement, sourceQuestion: Question) {
 
   if (question.secondFigure) {
     const image = document.createElement("img");
-    image.src = resolveAssetUrl(question.secondFigure);
     image.alt = question.secondFigureAlt ?? displayedFigureLabel(question.secondFigureCaption, figureNumber);
     shell.appendChild(image);
+    useImageSource(image, question.secondFigure);
     const caption = captionElement(question.secondFigureCaption);
     if (caption) shell.appendChild(caption);
   } else {
@@ -174,9 +183,9 @@ function renderSecondFigureEditor(panel: HTMLElement, sourceQuestion: Question) 
       const figure = document.createElement("figure");
       figure.className = "editor-figure-preview";
       const image = document.createElement("img");
-      image.src = resolveAssetUrl(effective.secondFigure);
       image.alt = effective.secondFigureAlt ?? displayedFigureLabel(effective.secondFigureCaption, figureNumber);
       figure.appendChild(image);
+      useImageSource(image, effective.secondFigure);
       const caption = captionElement(effective.secondFigureCaption);
       if (caption) figure.appendChild(caption);
       preview.appendChild(figure);
