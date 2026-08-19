@@ -113,7 +113,7 @@ export function prepareEditImagesForStorage(edits: EditStore): EditStore {
   }));
 }
 
-async function hydrateImageSource(source?: string): Promise<string | undefined> {
+export async function resolveStoredImageSource(source?: string): Promise<string | undefined> {
   if (!source) return source;
 
   if (source.startsWith(REF_PREFIX)) {
@@ -136,8 +136,8 @@ export async function hydrateEditImages(edits: EditStore): Promise<EditStore> {
     id,
     {
       ...edit,
-      figure: await hydrateImageSource(edit.figure),
-      secondFigure: await hydrateImageSource(edit.secondFigure),
+      figure: await resolveStoredImageSource(edit.figure),
+      secondFigure: await resolveStoredImageSource(edit.secondFigure),
     },
   ] as const));
   return Object.fromEntries(entries);
