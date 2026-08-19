@@ -1,3 +1,4 @@
+import "./fs21-additions";
 import { EXAMS, questions } from "./questions";
 import { EXAM_ID, EXAM_LABEL } from "./hs21-common";
 import { hs21Questions as q01to18 } from "./hs21-questions-01-18";
