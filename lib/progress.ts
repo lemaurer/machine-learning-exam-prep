@@ -20,6 +20,39 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
+function cleanLegacyFigureEdits(edits: EditStore): EditStore {
+  let changed = false;
+  const next: EditStore = Object.fromEntries(Object.entries(edits).map(([id, original]) => {
+    const edit: QuestionEdit = { ...original };
+
+    if (id === "hs22-q10" && edit.figureNumber === 4) {
+      delete edit.figureNumber;
+      delete edit.figure;
+      delete edit.figureAlt;
+      delete edit.figureCaption;
+      changed = true;
+    }
+    if (id === "hs22-q10" && edit.secondFigureNumber === 4) {
+      delete edit.secondFigureNumber;
+      delete edit.secondFigure;
+      delete edit.secondFigureAlt;
+      delete edit.secondFigureCaption;
+      changed = true;
+    }
+    if (edit.figureNumber === 4 && edit.sharedFigureQuestionIds?.includes("hs22-q10")) {
+      edit.sharedFigureQuestionIds = edit.sharedFigureQuestionIds.filter((memberId) => memberId !== "hs22-q10");
+      changed = true;
+    }
+    if (edit.secondFigureNumber === 4 && edit.secondSharedFigureQuestionIds?.includes("hs22-q10")) {
+      edit.secondSharedFigureQuestionIds = edit.secondSharedFigureQuestionIds.filter((memberId) => memberId !== "hs22-q10");
+      changed = true;
+    }
+
+    return [id, edit];
+  }));
+  return changed ? next : edits;
+}
+
 export function loadProgress() {
   return loadJson<ProgressStore>(PROGRESS_KEY, {});
 }
@@ -33,7 +66,7 @@ export function saveProgress(progress: ProgressStore) {
 }
 
 export function loadEdits() {
-  return loadJson<EditStore>(EDITS_KEY, {});
+  return cleanLegacyFigureEdits(loadJson<EditStore>(EDITS_KEY, {}));
 }
 
 export function saveEdits(edits: EditStore) {
