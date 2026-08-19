@@ -6,6 +6,13 @@ export type WeightedScore = {
   percentage: number;
 };
 
+export type ScoreBreakdown = WeightedScore & {
+  key: string;
+  label: string;
+};
+
+export type ScoreBreakdownDimension = "topic" | "difficulty" | "exam";
+
 export function questionPoints(question: Question): number {
   const match = question.source.match(/(?:^|·)\s*(\d+)\s+points?\b/i);
   const points = match ? Number(match[1]) : Number.NaN;
@@ -52,4 +59,31 @@ export function weightedSessionScore(
     possiblePoints,
     percentage: possiblePoints ? Math.round((earnedPoints / possiblePoints) * 100) : 0,
   };
+}
+
+function breakdownIdentity(question: Question, dimension: ScoreBreakdownDimension) {
+  if (dimension === "topic") return { key: question.topic, label: question.topic };
+  if (dimension === "difficulty") return { key: question.difficulty, label: question.difficulty };
+  return { key: question.examId, label: question.examId };
+}
+
+export function weightedProgressBreakdown(
+  questions: Question[],
+  progress: ProgressStore,
+  dimension: ScoreBreakdownDimension,
+): ScoreBreakdown[] {
+  const groups = new Map<string, { label: string; questions: Question[] }>();
+
+  for (const question of questions) {
+    const { key, label } = breakdownIdentity(question, dimension);
+    const group = groups.get(key);
+    if (group) group.questions.push(question);
+    else groups.set(key, { label, questions: [question] });
+  }
+
+  return Array.from(groups, ([key, group]) => ({
+    key,
+    label: group.label,
+    ...weightedProgressScore(group.questions, progress),
+  }));
 }
