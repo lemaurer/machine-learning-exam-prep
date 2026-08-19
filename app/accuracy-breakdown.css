@@ -1,0 +1,120 @@
+.accuracy-breakdown {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.accuracy-breakdown > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 28px;
+}
+
+.accuracy-breakdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.accuracy-breakdown > summary::after {
+  color: var(--ink-soft);
+  content: "+";
+  font-size: 16px;
+  line-height: 1;
+}
+
+.accuracy-breakdown[open] > summary::after {
+  content: "−";
+}
+
+.accuracy-breakdown > summary strong {
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.accuracy-breakdown > summary span {
+  color: var(--ink-soft);
+  font-size: 9px;
+  letter-spacing: .04em;
+  margin-left: auto;
+  text-transform: uppercase;
+}
+
+.accuracy-breakdown-controls {
+  margin-top: 8px;
+}
+
+.accuracy-breakdown-controls select {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+  height: 28px;
+  padding: 0 26px 0 8px;
+  width: 100%;
+}
+
+.accuracy-breakdown-list {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 7px;
+}
+
+.accuracy-breakdown-row {
+  border: 1px solid var(--line);
+  min-width: 0;
+  padding: 7px 8px 6px;
+}
+
+.accuracy-breakdown-row-heading {
+  align-items: baseline;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.accuracy-breakdown-row-heading span {
+  font-size: 9px;
+  line-height: 1.15;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accuracy-breakdown-row-heading strong {
+  flex: none;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.accuracy-breakdown-track {
+  background: var(--line);
+  height: 2px;
+  margin: 6px 0 4px;
+  overflow: hidden;
+}
+
+.accuracy-breakdown-track span {
+  background: var(--green);
+  display: block;
+  height: 100%;
+}
+
+.accuracy-breakdown-row small {
+  color: var(--ink-soft);
+  display: block;
+  font-size: 8.5px;
+  line-height: 1.1;
+}
+
+@media (max-width: 850px) {
+  .accuracy-breakdown-list {
+    grid-template-columns: 1fr;
+  }
+}
