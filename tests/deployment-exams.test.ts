@@ -10,6 +10,7 @@ import "../data/hs22-additions";
 import "../data/fs22-additions";
 import "../data/hs21-additions";
 import "../data/fs21-additions";
+import "../data/fs20-additions";
 import { EXAMS, questions } from "../data/questions";
 import { questionsForExam } from "../lib/question-selection";
 
@@ -24,6 +25,7 @@ const EXPECTED_IDS = [
   "FS22",
   "HS21",
   "FS21",
+  "FS20",
 ];
 
 test("production exam selector contains every imported exam in chronological order", () => {
@@ -36,8 +38,9 @@ test("every production exam has questions", () => {
   }
 });
 
-test("the three oldest newly imported exams are complete enough to deploy", () => {
+test("the oldest imported exams are complete enough to deploy", () => {
   assert.equal(questionsForExam(questions, "FS22").length, 48);
   assert.equal(questionsForExam(questions, "HS21").length, 50);
   assert.equal(questionsForExam(questions, "FS21").length, 53);
+  assert.equal(questionsForExam(questions, "FS20").length, 52);
 });
