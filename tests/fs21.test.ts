@@ -9,6 +9,7 @@ import "../data/fs23-additions";
 import "../data/hs22-additions";
 import "../data/fs22-additions";
 import "../data/hs21-additions";
+import "../data/fs21-additions";
 import { EXAMS, questions } from "../data/questions";
 import { correctOptionIds, DISPLAY_OPTION_IDS } from "../lib/answers";
 import { inferFigureNumber } from "../lib/question-edits";
