@@ -62,6 +62,11 @@ export type QuestionEdit = Partial<
   >
 > & {
   commonSetupQuestionIds?: string[];
+  /** Exact cards selected for the figure edited in the primary figure section. */
   sharedFigureQuestionIds?: string[];
+  /** Exact cards selected for the figure edited in the second figure section. */
+  secondSharedFigureQuestionIds?: string[];
+  /** Tombstones used when a supplied figure is deliberately removed from a card. */
+  hiddenFigureNumbers?: number[];
 };
 export type EditStore = Record<string, QuestionEdit>;
