@@ -6,6 +6,7 @@ import type {
   QuestionOption,
   QuestionProgress,
 } from "../types/question";
+import { prepareEditImagesForStorage } from "./images";
 
 export const PROGRESS_KEY = "iml-exam-prep-progress-v1";
 export const EDITS_KEY = "iml-exam-prep-edits-v1";
@@ -24,7 +25,11 @@ export function loadProgress() {
 }
 
 export function saveProgress(progress: ProgressStore) {
-  window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+  try {
+    window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+  } catch (error) {
+    console.error("Could not save study progress.", error);
+  }
 }
 
 export function loadEdits() {
@@ -32,7 +37,13 @@ export function loadEdits() {
 }
 
 export function saveEdits(edits: EditStore) {
-  window.localStorage.setItem(EDITS_KEY, JSON.stringify(edits));
+  try {
+    window.localStorage.setItem(EDITS_KEY, JSON.stringify(prepareEditImagesForStorage(edits)));
+    return true;
+  } catch (error) {
+    console.error("Could not save question edits.", error);
+    return false;
+  }
 }
 
 export function applyEdits(question: Question, edit?: QuestionEdit): Question {
