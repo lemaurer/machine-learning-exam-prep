@@ -9,6 +9,7 @@ import "../data/fs25-additions";
 import "../data/fs24-additions";
 import "../data/hs23-additions";
 import "../data/fs23-additions";
+import "../data/hs22-additions";
 import { ExamPrepApp } from "../app/ExamPrepApp";
 import { installMultiFigureSupport } from "../app/multi-figure";
 import "../app/session-tight.css";
