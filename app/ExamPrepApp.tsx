@@ -39,7 +39,7 @@ import {
   uniqueQuestionsById,
 } from "../lib/question-selection";
 import { resolveAssetUrl } from "../lib/assets";
-import { loadImageFile } from "../lib/images";
+import { hydrateEditImages, loadImageFile } from "../lib/images";
 import {
   DIFFICULTIES,
   TOPICS,
@@ -113,11 +113,27 @@ export function ExamPrepApp() {
   const [manuallyCorrectedIds, setManuallyCorrectedIds] = useState<string[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     const knownIds = new Set(sourceQuestions.map((question) => question.id));
     setProgress(Object.fromEntries(Object.entries(loadProgress()).filter(([id]) => knownIds.has(id))));
-    setEdits(Object.fromEntries(Object.entries(loadEdits()).filter(([id]) => knownIds.has(id))));
     setExamSettings(loadExamSettings());
-    setReady(true);
+
+    const storedEdits = Object.fromEntries(Object.entries(loadEdits()).filter(([id]) => knownIds.has(id)));
+    void hydrateEditImages(storedEdits)
+      .then((hydratedEdits) => {
+        if (cancelled) return;
+        setEdits(hydratedEdits);
+        saveEdits(hydratedEdits);
+        setReady(true);
+      })
+      .catch((error) => {
+        console.error("Could not restore stored figure images.", error);
+        if (cancelled) return;
+        setEdits(storedEdits);
+        setReady(true);
+      });
+
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
