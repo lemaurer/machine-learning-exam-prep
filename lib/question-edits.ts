@@ -1,4 +1,5 @@
 import type { EditStore, Question, QuestionEdit } from "../types/question";
+import { questions as sourceQuestions } from "../data/questions";
 import { applyEdits } from "./progress";
 
 function uniqueIds(ids: string[]) {
@@ -10,9 +11,7 @@ function validFigureNumber(value: unknown): value is number {
 }
 
 function hiddenWithout(edit: QuestionEdit, figureNumber: number) {
-  const hidden = uniqueIds((edit.hiddenFigureNumbers ?? []).map(String))
-    .map(Number)
-    .filter((number) => number !== figureNumber);
+  const hidden = [...new Set(edit.hiddenFigureNumbers ?? [])].filter((number) => number !== figureNumber);
   return hidden.length ? hidden : undefined;
 }
 
@@ -101,14 +100,7 @@ function applyFigureMembership(
   const previousMembers = questions
     .filter((question) => inferFigureNumbers(applyEdits(question, current[question.id])).includes(figureNumber))
     .map((question) => question.id);
-  const idsToVisit = uniqueIds([
-    ...previousMembers,
-    ...memberIds,
-    ...Object.entries(current)
-      .filter(([, edit]) => (edit[groupField] ?? []).some((id) => id === id))
-      .flatMap(([, edit]) => edit[groupField] ?? []),
-  ]);
-
+  const idsToVisit = uniqueIds([...previousMembers, ...memberIds]);
   const next: EditStore = { ...current };
 
   for (const memberId of idsToVisit) {
@@ -163,7 +155,8 @@ export function applySharedFigureImage(
   const figureNumber = explicitFigureNumber ?? inferFigureNumber(question);
   if (!validFigureNumber(figureNumber)) return current;
 
-  const effectiveQuestions = questions.map((candidate) => applyEdits(candidate, current[candidate.id]));
+  const bank = questions.length ? questions : sourceQuestions;
+  const effectiveQuestions = bank.map((candidate) => applyEdits(candidate, current[candidate.id]));
   const members = effectiveQuestions.filter(
     (candidate) => candidate.examId === question.examId && inferFigureNumbers(candidate).includes(figureNumber),
   );
@@ -241,8 +234,9 @@ export function applyQuestionEditWithCommonSetup(
     next[removedId] = rest;
   }
 
-  const owner = questions.find((candidate) => candidate.id === questionId);
-  const examQuestions = owner ? questions.filter((candidate) => candidate.examId === owner.examId) : questions;
+  const bank = questions.length ? questions : sourceQuestions;
+  const owner = bank.find((candidate) => candidate.id === questionId);
+  const examQuestions = owner ? bank.filter((candidate) => candidate.examId === owner.examId) : bank;
 
   if (validFigureNumber(figureNumber)) {
     const members = sharedFigureQuestionIds ?? (owner ? figureQuestionIdsForNumber(examQuestions, owner.examId, figureNumber) : [questionId]);
@@ -288,7 +282,7 @@ export function sanitizeKnownBadFigureAssignments(current: EditStore) {
       edit.sharedFigureQuestionIds = edit.sharedFigureQuestionIds.filter((memberId) => memberId !== "hs22-q10");
       changed = true;
     }
-    if (edit.secondSharedFigureQuestionIds?.includes("hs22-q10")) {
+    if (edit.secondFigureNumber === 4 && edit.secondSharedFigureQuestionIds?.includes("hs22-q10")) {
       edit.secondSharedFigureQuestionIds = edit.secondSharedFigureQuestionIds.filter((memberId) => memberId !== "hs22-q10");
       changed = true;
     }
