@@ -8,6 +8,7 @@ import "../data/hs23-additions";
 import "../data/fs23-additions";
 import "../data/hs22-additions";
 import "../data/fs22-additions";
+import "../data/hs21-additions";
 import { questions } from "../data/questions";
 import {
   questionPoints,
