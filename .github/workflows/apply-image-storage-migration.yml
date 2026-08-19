@@ -1,0 +1,64 @@
+name: Apply image storage migration patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-image-storage-migration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch app hydration and editor upload
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          app = Path('app/ExamPrepApp.tsx')
+          text = app.read_text()
+          text = text.replace(
+              'import { loadImageFile } from "../lib/images";',
+              'import { hydrateEditImages, loadImageFile } from "../lib/images";',
+              1,
+          )
+          old = '''  useEffect(() => {\n    const knownIds = new Set(sourceQuestions.map((question) => question.id));\n    setProgress(Object.fromEntries(Object.entries(loadProgress()).filter(([id]) => knownIds.has(id))));\n    setEdits(Object.fromEntries(Object.entries(loadEdits()).filter(([id]) => knownIds.has(id))));\n    setExamSettings(loadExamSettings());\n    setReady(true);\n  }, []);'''
+          new = '''  useEffect(() => {\n    let cancelled = false;\n    const knownIds = new Set(sourceQuestions.map((question) => question.id));\n    setProgress(Object.fromEntries(Object.entries(loadProgress()).filter(([id]) => knownIds.has(id))));\n    setExamSettings(loadExamSettings());\n\n    const storedEdits = Object.fromEntries(Object.entries(loadEdits()).filter(([id]) => knownIds.has(id)));\n    void hydrateEditImages(storedEdits)\n      .then((hydratedEdits) => {\n        if (cancelled) return;\n        setEdits(hydratedEdits);\n        saveEdits(hydratedEdits);\n        setReady(true);\n      })\n      .catch((error) => {\n        console.error("Could not restore stored figure images.", error);\n        if (cancelled) return;\n        setEdits(storedEdits);\n        setReady(true);\n      });\n\n    return () => { cancelled = true; };\n  }, []);'''
+          if old not in text:
+              raise SystemExit('Could not find ExamPrepApp startup effect')
+          text = text.replace(old, new, 1)
+          app.write_text(text)
+
+          editor = Path('app/components/QuestionEditor.tsx')
+          text = editor.read_text()
+          anchor = 'import { correctOptionIds } from "../../lib/answers";\n'
+          if 'from "../../lib/images"' not in text:
+              if anchor not in text:
+                  raise SystemExit('Could not find QuestionEditor import anchor')
+              text = text.replace(anchor, anchor + 'import { loadImageFile } from "../../lib/images";\n', 1)
+
+          pattern = re.compile(r'\nfunction loadImageFile\(file: File\): Promise<string> \{.*?\n\}\n\nfunction parseQuestionNumbers', re.S)
+          text, count = pattern.subn('\nfunction parseQuestionNumbers', text, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one local loadImageFile helper, found {count}')
+          editor.write_text(text)
+          PY
+      - name: Remove one-off workflow
+        run: git rm .github/workflows/apply-image-storage-migration.yml
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/ExamPrepApp.tsx app/components/QuestionEditor.tsx
+          git commit -m "Migrate figure uploads out of localStorage"
+          git push
