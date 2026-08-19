@@ -13,6 +13,7 @@ import "../data/hs22-additions";
 import "../data/fs22-additions";
 import "../data/hs21-additions";
 import "../data/fs21-additions";
+import "../data/fs20-additions";
 import { ExamPrepApp } from "../app/ExamPrepApp";
 import { installMultiFigureSupport } from "../app/multi-figure";
 import { installWeightedScoringPresentation } from "../app/weighted-scoring";
