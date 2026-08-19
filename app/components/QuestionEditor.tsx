@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { DIFFICULTIES, TOPICS, type Question, type QuestionEdit } from "../../types/question";
 import { LatexText } from "./LatexText";
 import { resolveAssetUrl } from "../../lib/assets";
-import { inferFigureNumber } from "../../lib/question-edits";
+import { inferFigureNumber, inferFigureNumbers } from "../../lib/question-edits";
 import { correctOptionIds } from "../../lib/answers";
-import { loadImageFile } from "../../lib/images";
+import { loadImageFile, resolveStoredImageSource } from "../../lib/images";
 
 function parseQuestionNumbers(value: string): number[] | null {
   if (!value.trim()) return [];
@@ -31,6 +31,30 @@ function parseQuestionNumbers(value: string): number[] | null {
   return [...new Set(numbers)].sort((left, right) => left - right);
 }
 
+function FigurePreview({ source, alt, caption }: { source: string; alt?: string; caption?: string }) {
+  const [resolved, setResolved] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void resolveStoredImageSource(source)
+      .then((value) => {
+        if (cancelled || !value) return;
+        setResolved(resolveAssetUrl(value) ?? value);
+      })
+      .catch(() => {
+        if (!cancelled) setResolved(resolveAssetUrl(source) ?? source);
+      });
+    return () => { cancelled = true; };
+  }, [source]);
+
+  return (
+    <figure className="editor-figure-preview">
+      {resolved && <img src={resolved} alt={alt || "Figure preview"} />}
+      {caption && <figcaption><LatexText text={caption} /></figcaption>}
+    </figure>
+  );
+}
+
 export function QuestionEditor({
   question,
   examQuestions,
@@ -52,8 +76,13 @@ export function QuestionEditor({
   const [commonSetupNumbers, setCommonSetupNumbers] = useState("");
   const [commonSetupError, setCommonSetupError] = useState("");
   const [figureNumberText, setFigureNumberText] = useState("");
+  const [figureQuestionNumbers, setFigureQuestionNumbers] = useState("");
   const [figureError, setFigureError] = useState("");
   const [figureLoading, setFigureLoading] = useState(false);
+  const [secondFigureNumberText, setSecondFigureNumberText] = useState("");
+  const [secondFigureQuestionNumbers, setSecondFigureQuestionNumbers] = useState("");
+  const [secondFigureError, setSecondFigureError] = useState("");
+  const [secondFigureLoading, setSecondFigureLoading] = useState(false);
 
   useEffect(() => {
     setDraft(question);
@@ -66,49 +95,96 @@ export function QuestionEditor({
         .join(", "),
     );
     setCommonSetupError("");
-    setFigureNumberText(String(inferFigureNumber(question) ?? ""));
+
+    const primaryNumber = inferFigureNumber(question);
+    setFigureNumberText(String(primaryNumber ?? ""));
+    setFigureQuestionNumbers(primaryNumber
+      ? examQuestions
+          .filter((candidate) => inferFigureNumbers(candidate).includes(primaryNumber))
+          .map((candidate) => candidate.number)
+          .sort((left, right) => left - right)
+          .join(", ")
+      : "");
     setFigureError("");
+
+    const secondaryNumber = question.secondFigureNumber;
+    setSecondFigureNumberText(String(secondaryNumber ?? ""));
+    setSecondFigureQuestionNumbers(secondaryNumber
+      ? examQuestions
+          .filter((candidate) => inferFigureNumbers(candidate).includes(secondaryNumber))
+          .map((candidate) => candidate.number)
+          .sort((left, right) => left - right)
+          .join(", ")
+      : "");
+    setSecondFigureError("");
   }, [examQuestions, question, sharedSetupQuestionIds]);
 
-  function save() {
-    const numbers = parseQuestionNumbers(commonSetupNumbers);
+  function questionIdsFromNumbers(value: string, errorSetter: (message: string) => void, label: string) {
+    const numbers = parseQuestionNumbers(value);
     if (numbers === null) {
+      errorSetter("Use question numbers separated by commas, or a range such as 14-17.");
+      return null;
+    }
+    const questionByNumber = new Map(examQuestions.map((candidate) => [candidate.number, candidate]));
+    const missing = numbers.filter((number) => !questionByNumber.has(number));
+    if (missing.length) {
+      errorSetter(`${label}: question${missing.length === 1 ? "" : "s"} ${missing.join(", ")} do not exist in ${question.examId}.`);
+      return null;
+    }
+    return numbers.map((number) => questionByNumber.get(number)!.id);
+  }
+
+  function parseFigureNumber(value: string, setter: (message: string) => void) {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const number = Number(trimmed);
+    if (!Number.isInteger(number) || number <= 0) {
+      setter("Figure number must be a positive whole number, such as 1 or 4.");
+      return null;
+    }
+    return number;
+  }
+
+  function save() {
+    const setupNumbers = parseQuestionNumbers(commonSetupNumbers);
+    if (setupNumbers === null) {
       setCommonSetupError("Use question numbers separated by commas, or a range such as 7-9.");
       return;
     }
 
     const questionByNumber = new Map(examQuestions.map((candidate) => [candidate.number, candidate]));
-    const missing = numbers.filter((number) => !questionByNumber.has(number));
-    if (missing.length) {
-      setCommonSetupError(`Question${missing.length === 1 ? "" : "s"} ${missing.join(", ")} ${missing.length === 1 ? "does" : "do"} not exist in ${question.examId}.`);
+    const missingSetup = setupNumbers.filter((number) => !questionByNumber.has(number));
+    if (missingSetup.length) {
+      setCommonSetupError(`Question${missingSetup.length === 1 ? "" : "s"} ${missingSetup.join(", ")} ${missingSetup.length === 1 ? "does" : "do"} not exist in ${question.examId}.`);
       return;
     }
-
-    const commonSetupQuestionIds = numbers.length
-      ? [...new Set([question.id, ...numbers.map((number) => questionByNumber.get(number)!.id)])]
+    const commonSetupQuestionIds = setupNumbers.length
+      ? [...new Set([question.id, ...setupNumbers.map((number) => questionByNumber.get(number)!.id)])]
       : [];
 
-    const trimmedFigureNumber = figureNumberText.trim();
-    const figureNumber = trimmedFigureNumber ? Number(trimmedFigureNumber) : undefined;
-    if (trimmedFigureNumber && (!Number.isInteger(figureNumber) || Number(figureNumber) <= 0)) {
-      setFigureError("Figure number must be a positive whole number, such as 1 or 4.");
-      return;
-    }
+    const figureNumber = parseFigureNumber(figureNumberText, setFigureError);
+    if (figureNumber === null) return;
     if (draft.figure && !figureNumber) {
-      setFigureError("Every figure needs a figure number so it can be shared across all questions that use it.");
+      setFigureError("Every figure needs a figure number.");
       return;
     }
-
     const sharedFigureQuestionIds = figureNumber
-      ? [...new Set([
-          question.id,
-          ...examQuestions
-            .filter((candidate) => inferFigureNumber(candidate) === figureNumber)
-            .map((candidate) => candidate.id),
-        ])]
+      ? questionIdsFromNumbers(figureQuestionNumbers, setFigureError, `Figure ${figureNumber}`)
       : [];
-    const correctIds = correctOptionIds(draft);
+    if (sharedFigureQuestionIds === null) return;
 
+    const secondFigureNumber = parseFigureNumber(secondFigureNumberText, setSecondFigureError);
+    if (secondFigureNumber === null) return;
+    if (draft.secondFigure && !secondFigureNumber) {
+      setSecondFigureError("Every second figure needs a figure number.");
+      return;
+    }
+    const secondSharedFigureQuestionIds = secondFigureNumber
+      ? questionIdsFromNumbers(secondFigureQuestionNumbers, setSecondFigureError, `Figure ${secondFigureNumber}`)
+      : [];
+    if (secondSharedFigureQuestionIds === null) return;
+
+    const correctIds = correctOptionIds(draft);
     onSave({
       setup: draft.setup,
       prompt: draft.prompt,
@@ -124,6 +200,11 @@ export function QuestionEditor({
       figureAlt: draft.figureAlt,
       figureCaption: draft.figureCaption,
       sharedFigureQuestionIds,
+      secondFigureNumber,
+      secondFigure: draft.secondFigure,
+      secondFigureAlt: draft.secondFigureAlt,
+      secondFigureCaption: draft.secondFigureCaption,
+      secondSharedFigureQuestionIds,
     }, commonSetupQuestionIds);
   }
 
@@ -145,10 +226,9 @@ export function QuestionEditor({
       <label className="editor-field">
         <span>Common setup applies to question numbers</span>
         <input value={commonSetupNumbers} onChange={(event) => { setCommonSetupNumbers(event.target.value); setCommonSetupError(""); }} placeholder="e.g. 7, 8, 9 or 7-9" />
-        <small>Leave blank to keep the setup specific to this question. If you enter a group, Question {question.number} is included automatically. Editing the common setup later from any member updates the whole group.</small>
+        <small>Leave blank to keep the setup specific to this question. If you enter a group, Question {question.number} is included automatically.</small>
       </label>
       {commonSetupError && <p className="editor-error" role="alert">{commonSetupError}</p>}
-
       {draft.setup && <div className="live-preview"><span>Setup rendering</span><div><LatexText text={draft.setup} /></div></div>}
 
       <label className="editor-field">
@@ -160,13 +240,19 @@ export function QuestionEditor({
       <div className="editor-figure-section">
         <div className="editor-figure-heading">
           <strong>Figure</strong>
-          <small>Figures are shared by exam and figure number. Editing Figure 4 here updates Figure 4 everywhere it is used in {question.examId}.</small>
+          <small>The figure number identifies the image. You explicitly control which question cards show it.</small>
         </div>
         <label className="editor-field">
           <span>Figure number</span>
           <input inputMode="numeric" value={figureNumberText} placeholder="e.g. 4" onChange={(event) => { setFigureNumberText(event.target.value); setFigureError(""); }} />
-          <small>The number identifies the shared figure within this exam. Existing filenames such as <code>hs25_figure4.png</code> are recognized automatically.</small>
         </label>
+        {figureNumberText.trim() && (
+          <label className="editor-field">
+            <span>Show this figure on question numbers</span>
+            <input value={figureQuestionNumbers} onChange={(event) => { setFigureQuestionNumbers(event.target.value); setFigureError(""); }} placeholder="e.g. 14-17" />
+            <small>This list is authoritative. Remove a question number here and the figure is removed from that card.</small>
+          </label>
+        )}
         <label className="editor-field">
           <span>Figure path or URL</span>
           <input value={draft.figure ?? ""} placeholder="/figures/filename.png" onChange={(event) => { setDraft({ ...draft, figure: event.target.value || undefined }); setFigureError(""); }} />
@@ -197,16 +283,65 @@ export function QuestionEditor({
           <span>Figure caption · LaTeX supported</span>
           <input value={draft.figureCaption ?? ""} placeholder="Caption shown below the figure" onChange={(event) => setDraft({ ...draft, figureCaption: event.target.value || undefined })} />
         </label>
-        {draft.figure ? (
-          <figure className="editor-figure-preview">
-            <img src={resolveAssetUrl(draft.figure)} alt={draft.figureAlt || "Figure preview"} />
-            {draft.figureCaption && <figcaption><LatexText text={draft.figureCaption} /></figcaption>}
-          </figure>
-        ) : figureNumberText.trim() ? (
-          <div className="live-preview"><span>Figure placeholder</span><div>Figure {figureNumberText.trim()} is linked but has no image yet.</div></div>
+        {draft.figure ? <FigurePreview source={draft.figure} alt={draft.figureAlt} caption={draft.figureCaption} /> : figureNumberText.trim() ? (
+          <div className="live-preview"><span>Figure placeholder</span><div>Figure {figureNumberText.trim()} has no image yet.</div></div>
         ) : null}
-        {draft.figure && <button className="text-button danger" onClick={() => setDraft({ ...draft, figure: undefined, figureAlt: undefined, figureCaption: undefined })}>Remove figure</button>}
+        {draft.figure && <button className="text-button danger" onClick={() => setDraft({ ...draft, figure: undefined, figureAlt: undefined, figureCaption: undefined })}>Remove image</button>}
       </div>
+
+      {(secondFigureNumberText || draft.secondFigure || question.secondFigureNumber) ? (
+        <div className="editor-figure-section">
+          <div className="editor-figure-heading">
+            <strong>Second figure</strong>
+            <small>This is an independent figure with its own card membership.</small>
+          </div>
+          <label className="editor-field">
+            <span>Figure number</span>
+            <input inputMode="numeric" value={secondFigureNumberText} placeholder="e.g. 4" onChange={(event) => { setSecondFigureNumberText(event.target.value); setSecondFigureError(""); }} />
+          </label>
+          {secondFigureNumberText.trim() && (
+            <label className="editor-field">
+              <span>Show this figure on question numbers</span>
+              <input value={secondFigureQuestionNumbers} onChange={(event) => { setSecondFigureQuestionNumbers(event.target.value); setSecondFigureError(""); }} placeholder="e.g. 14-17" />
+              <small>This list is authoritative. Remove a question number here and the second figure disappears from that card.</small>
+            </label>
+          )}
+          <label className="editor-field">
+            <span>Figure path or URL</span>
+            <input value={draft.secondFigure ?? ""} placeholder="/figures/filename.png" onChange={(event) => { setDraft({ ...draft, secondFigure: event.target.value || undefined }); setSecondFigureError(""); }} />
+          </label>
+          <label className="editor-file-button">
+            <span>{secondFigureLoading ? "Preparing image…" : "Choose second image from this computer"}</span>
+            <input type="file" accept="image/*" disabled={secondFigureLoading} onChange={async (event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              setSecondFigureError("");
+              setSecondFigureLoading(true);
+              try {
+                const secondFigure = await loadImageFile(file);
+                setDraft((current) => ({ ...current, secondFigure }));
+              } catch (error) {
+                setSecondFigureError(error instanceof Error ? error.message : "Could not use that image.");
+              } finally {
+                setSecondFigureLoading(false);
+              }
+            }} />
+          </label>
+          {secondFigureError && <p className="editor-error" role="alert">{secondFigureError}</p>}
+          <label className="editor-field">
+            <span>Alternative text</span>
+            <input value={draft.secondFigureAlt ?? ""} placeholder="Describe the second figure" onChange={(event) => setDraft({ ...draft, secondFigureAlt: event.target.value || undefined })} />
+          </label>
+          <label className="editor-field">
+            <span>Figure caption · LaTeX supported</span>
+            <input value={draft.secondFigureCaption ?? ""} placeholder="Caption shown below the second figure" onChange={(event) => setDraft({ ...draft, secondFigureCaption: event.target.value || undefined })} />
+          </label>
+          {draft.secondFigure ? <FigurePreview source={draft.secondFigure} alt={draft.secondFigureAlt} caption={draft.secondFigureCaption} /> : secondFigureNumberText.trim() ? (
+            <div className="live-preview"><span>Figure placeholder</span><div>Figure {secondFigureNumberText.trim()} has no image yet.</div></div>
+          ) : null}
+          {draft.secondFigure && <button className="text-button danger" onClick={() => setDraft({ ...draft, secondFigure: undefined, secondFigureAlt: undefined, secondFigureCaption: undefined })}>Remove second image</button>}
+        </div>
+      ) : null}
 
       <div className="editor-options">
         {draft.options.map((option, index) => (
