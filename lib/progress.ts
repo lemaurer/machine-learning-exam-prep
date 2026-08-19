@@ -48,10 +48,34 @@ export function saveEdits(edits: EditStore) {
 
 export function applyEdits(question: Question, edit?: QuestionEdit): Question {
   if (!edit) return question;
-  const { commonSetupQuestionIds, sharedFigureQuestionIds, ...questionEdit } = edit;
+  const {
+    commonSetupQuestionIds,
+    sharedFigureQuestionIds,
+    secondSharedFigureQuestionIds,
+    hiddenFigureNumbers = [],
+    ...questionEdit
+  } = edit;
   void commonSetupQuestionIds;
   void sharedFigureQuestionIds;
-  return { ...question, ...questionEdit, id: question.id, examId: question.examId };
+  void secondSharedFigureQuestionIds;
+
+  const merged: Question = { ...question, ...questionEdit, id: question.id, examId: question.examId };
+  const hidden = new Set(hiddenFigureNumbers);
+
+  if (merged.figureNumber && hidden.has(merged.figureNumber)) {
+    merged.figureNumber = undefined;
+    merged.figure = undefined;
+    merged.figureAlt = undefined;
+    merged.figureCaption = undefined;
+  }
+  if (merged.secondFigureNumber && hidden.has(merged.secondFigureNumber)) {
+    merged.secondFigureNumber = undefined;
+    merged.secondFigure = undefined;
+    merged.secondFigureAlt = undefined;
+    merged.secondFigureCaption = undefined;
+  }
+
+  return merged;
 }
 
 export function answerProgress(
