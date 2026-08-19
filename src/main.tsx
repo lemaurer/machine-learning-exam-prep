@@ -13,6 +13,7 @@ import "../data/hs22-additions";
 import "../data/fs22-additions";
 import { ExamPrepApp } from "../app/ExamPrepApp";
 import { installMultiFigureSupport } from "../app/multi-figure";
+import { installWeightedScoringPresentation } from "../app/weighted-scoring";
 import "../app/session-tight.css";
 
 const root = document.getElementById("root");
@@ -176,6 +177,7 @@ document.addEventListener("keydown", (event) => {
 }, true);
 
 installMultiFigureSupport();
+installWeightedScoringPresentation();
 
 createRoot(root).render(
   <StrictMode>
