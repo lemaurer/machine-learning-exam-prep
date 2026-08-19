@@ -1,4 +1,5 @@
 import type { EditStore, Question, QuestionEdit } from "../types/question";
+import { applyEdits } from "./progress";
 
 function uniqueIds(ids: string[]) {
   return [...new Set(ids)];
@@ -6,6 +7,35 @@ function uniqueIds(ids: string[]) {
 
 function validFigureNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function hiddenWithout(edit: QuestionEdit, figureNumber: number) {
+  const hidden = uniqueIds((edit.hiddenFigureNumbers ?? []).map(String))
+    .map(Number)
+    .filter((number) => number !== figureNumber);
+  return hidden.length ? hidden : undefined;
+}
+
+function hiddenWith(edit: QuestionEdit, figureNumber: number) {
+  return [...new Set([...(edit.hiddenFigureNumbers ?? []), figureNumber])].sort((a, b) => a - b);
+}
+
+function clearPrimaryFigureFields(edit: QuestionEdit) {
+  const next = { ...edit };
+  delete next.figureNumber;
+  delete next.figure;
+  delete next.figureAlt;
+  delete next.figureCaption;
+  return next;
+}
+
+function clearSecondFigureFields(edit: QuestionEdit) {
+  const next = { ...edit };
+  delete next.secondFigureNumber;
+  delete next.secondFigure;
+  delete next.secondFigureAlt;
+  delete next.secondFigureCaption;
+  return next;
 }
 
 export function inferFigureNumber(question: Question) {
@@ -43,6 +73,86 @@ export function inferCommonSetupQuestionIds(
   return inferred.length > 1 ? inferred : [];
 }
 
+export function figureQuestionIdsForNumber(questions: Question[], examId: string, figureNumber: number) {
+  return questions
+    .filter((candidate) => candidate.examId === examId && inferFigureNumbers(candidate).includes(figureNumber))
+    .map((candidate) => candidate.id);
+}
+
+type FigurePayload = {
+  figureNumber: number;
+  figure?: string;
+  figureAlt?: string;
+  figureCaption?: string;
+};
+
+function applyFigureMembership(
+  current: EditStore,
+  questions: Question[],
+  payload: FigurePayload,
+  requestedMemberIds: string[],
+  preferredSlot: "primary" | "secondary",
+  groupField: "sharedFigureQuestionIds" | "secondSharedFigureQuestionIds",
+) {
+  const figureNumber = payload.figureNumber;
+  const memberIds = uniqueIds(requestedMemberIds);
+  const groupValue = memberIds.length > 1 ? memberIds : undefined;
+  const questionById = new Map(questions.map((question) => [question.id, question]));
+  const previousMembers = questions
+    .filter((question) => inferFigureNumbers(applyEdits(question, current[question.id])).includes(figureNumber))
+    .map((question) => question.id);
+  const idsToVisit = uniqueIds([
+    ...previousMembers,
+    ...memberIds,
+    ...Object.entries(current)
+      .filter(([, edit]) => (edit[groupField] ?? []).some((id) => id === id))
+      .flatMap(([, edit]) => edit[groupField] ?? []),
+  ]);
+
+  const next: EditStore = { ...current };
+
+  for (const memberId of idsToVisit) {
+    const source = questionById.get(memberId);
+    let edit: QuestionEdit = { ...(next[memberId] ?? {}) };
+    const isSelected = memberIds.includes(memberId);
+
+    if (!isSelected) {
+      const effective = source ? applyEdits(source, edit) : undefined;
+      if (effective?.figureNumber === figureNumber || edit.figureNumber === figureNumber) edit = clearPrimaryFigureFields(edit);
+      if (effective?.secondFigureNumber === figureNumber || edit.secondFigureNumber === figureNumber) edit = clearSecondFigureFields(edit);
+      edit.hiddenFigureNumbers = hiddenWith(edit, figureNumber);
+      delete edit[groupField];
+      next[memberId] = edit;
+      continue;
+    }
+
+    edit.hiddenFigureNumbers = hiddenWithout(edit, figureNumber);
+    edit[groupField] = groupValue;
+    const effective = source ? applyEdits(source, edit) : undefined;
+
+    let slot: "primary" | "secondary" = preferredSlot;
+    if (effective?.figureNumber === figureNumber || edit.figureNumber === figureNumber) slot = "primary";
+    else if (effective?.secondFigureNumber === figureNumber || edit.secondFigureNumber === figureNumber) slot = "secondary";
+    else if (preferredSlot === "primary" && effective?.figureNumber && !effective.secondFigureNumber) slot = "secondary";
+    else if (preferredSlot === "secondary" && effective?.secondFigureNumber && !effective.figureNumber) slot = "primary";
+
+    if (slot === "primary") {
+      edit.figureNumber = figureNumber;
+      edit.figure = payload.figure;
+      edit.figureAlt = payload.figureAlt;
+      edit.figureCaption = payload.figureCaption;
+    } else {
+      edit.secondFigureNumber = figureNumber;
+      edit.secondFigure = payload.figure;
+      edit.secondFigureAlt = payload.figureAlt;
+      edit.secondFigureCaption = payload.figureCaption;
+    }
+    next[memberId] = edit;
+  }
+
+  return next;
+}
+
 export function applySharedFigureImage(
   current: EditStore,
   question: Question,
@@ -53,37 +163,27 @@ export function applySharedFigureImage(
   const figureNumber = explicitFigureNumber ?? inferFigureNumber(question);
   if (!validFigureNumber(figureNumber)) return current;
 
-  const members = questions.filter(
+  const effectiveQuestions = questions.map((candidate) => applyEdits(candidate, current[candidate.id]));
+  const members = effectiveQuestions.filter(
     (candidate) => candidate.examId === question.examId && inferFigureNumbers(candidate).includes(figureNumber),
   );
-  const memberIds = uniqueIds([question.id, ...members.map((candidate) => candidate.id)]);
-  const sharedFigureQuestionIds = memberIds.length > 1 ? memberIds : undefined;
   const next: EditStore = { ...current };
 
-  for (const memberId of memberIds) {
-    const member = questions.find((candidate) => candidate.id === memberId) ?? question;
-    const existing = current[memberId] ?? {};
-    const isSecondSlot = member.secondFigureNumber === figureNumber;
-
-    if (isSecondSlot) {
-      next[memberId] = {
-        ...existing,
-        secondFigureNumber: figureNumber,
-        secondFigure: figure,
-        secondFigureAlt: member.secondFigureAlt ?? `Figure ${figureNumber}`,
-        secondFigureCaption: member.secondFigureCaption,
-        sharedFigureQuestionIds,
-      };
+  for (const member of members) {
+    const existing: QuestionEdit = { ...(next[member.id] ?? {}) };
+    if (member.secondFigureNumber === figureNumber) {
+      existing.secondFigureNumber = figureNumber;
+      existing.secondFigure = figure;
+      existing.secondFigureAlt = member.secondFigureAlt ?? `Figure ${figureNumber}`;
+      existing.secondFigureCaption = member.secondFigureCaption;
     } else {
-      next[memberId] = {
-        ...existing,
-        figureNumber,
-        figure,
-        figureAlt: member.figureAlt ?? `Figure ${figureNumber}`,
-        figureCaption: member.figureCaption,
-        sharedFigureQuestionIds,
-      };
+      existing.figureNumber = figureNumber;
+      existing.figure = figure;
+      existing.figureAlt = member.figureAlt ?? `Figure ${figureNumber}`;
+      existing.figureCaption = member.figureCaption;
     }
+    existing.hiddenFigureNumbers = hiddenWithout(existing, figureNumber);
+    next[member.id] = existing;
   }
 
   return next;
@@ -94,23 +194,34 @@ export function applyQuestionEditWithCommonSetup(
   questionId: string,
   edit: QuestionEdit,
   commonSetupQuestionIds: string[],
+  questions: Question[] = [],
 ) {
-  const next: EditStore = { ...current };
+  let next: EditStore = { ...current };
   const previousGroup = uniqueIds(current[questionId]?.commonSetupQuestionIds ?? []);
   const requestedGroup = uniqueIds(commonSetupQuestionIds);
   const group = requestedGroup.length > 1 ? requestedGroup : [];
   const commonSetupQuestionIdsValue = group.length ? group : undefined;
 
-  const previousFigureGroup = uniqueIds(current[questionId]?.sharedFigureQuestionIds ?? []);
-  const requestedFigureGroup = validFigureNumber(edit.figureNumber)
-    ? uniqueIds([questionId, ...(edit.sharedFigureQuestionIds ?? [])])
-    : [];
-  const sharedFigureQuestionIdsValue = requestedFigureGroup.length > 1 ? requestedFigureGroup : undefined;
+  const {
+    figureNumber,
+    figure,
+    figureAlt,
+    figureCaption,
+    secondFigureNumber,
+    secondFigure,
+    secondFigureAlt,
+    secondFigureCaption,
+    sharedFigureQuestionIds,
+    secondSharedFigureQuestionIds,
+    hiddenFigureNumbers,
+    ...nonFigureEdit
+  } = edit;
 
   next[questionId] = {
-    ...edit,
+    ...(current[questionId] ?? {}),
+    ...nonFigureEdit,
     commonSetupQuestionIds: commonSetupQuestionIdsValue,
-    sharedFigureQuestionIds: sharedFigureQuestionIdsValue,
+    hiddenFigureNumbers: hiddenFigureNumbers ?? current[questionId]?.hiddenFigureNumbers,
   };
 
   for (const memberId of group) {
@@ -130,39 +241,69 @@ export function applyQuestionEditWithCommonSetup(
     next[removedId] = rest;
   }
 
-  if (validFigureNumber(edit.figureNumber)) {
-    for (const memberId of requestedFigureGroup) {
-      next[memberId] = {
-        ...(next[memberId] ?? current[memberId] ?? {}),
-        figureNumber: edit.figureNumber,
-        figure: edit.figure,
-        figureAlt: edit.figureAlt,
-        figureCaption: edit.figureCaption,
-        sharedFigureQuestionIds: sharedFigureQuestionIdsValue,
-      };
-    }
+  const owner = questions.find((candidate) => candidate.id === questionId);
+  const examQuestions = owner ? questions.filter((candidate) => candidate.examId === owner.examId) : questions;
+
+  if (validFigureNumber(figureNumber)) {
+    const members = sharedFigureQuestionIds ?? (owner ? figureQuestionIdsForNumber(examQuestions, owner.examId, figureNumber) : [questionId]);
+    next = applyFigureMembership(next, examQuestions, {
+      figureNumber,
+      figure,
+      figureAlt,
+      figureCaption,
+    }, members, "primary", "sharedFigureQuestionIds");
   }
 
-  const remainingPreviousFigureGroup = previousFigureGroup.filter((id) => !requestedFigureGroup.includes(id));
-  if (remainingPreviousFigureGroup.length) {
-    const remainingValue = remainingPreviousFigureGroup.length > 1 ? remainingPreviousFigureGroup : undefined;
-    for (const memberId of remainingPreviousFigureGroup) {
-      const member = next[memberId] ?? current[memberId];
-      if (!member) continue;
-      next[memberId] = {
-        ...member,
-        sharedFigureQuestionIds: remainingValue,
-      };
-    }
+  if (validFigureNumber(secondFigureNumber)) {
+    const members = secondSharedFigureQuestionIds ?? (owner ? figureQuestionIdsForNumber(examQuestions, owner.examId, secondFigureNumber) : [questionId]);
+    next = applyFigureMembership(next, examQuestions, {
+      figureNumber: secondFigureNumber,
+      figure: secondFigure,
+      figureAlt: secondFigureAlt,
+      figureCaption: secondFigureCaption,
+    }, members, "secondary", "secondSharedFigureQuestionIds");
   }
 
   return next;
+}
+
+/** Remove a legacy corrupt assignment that could place HS22 Figure 4 on Question 10. */
+export function sanitizeKnownBadFigureAssignments(current: EditStore) {
+  let changed = false;
+  const next: EditStore = Object.fromEntries(Object.entries(current).map(([id, raw]) => {
+    let edit: QuestionEdit = { ...raw };
+
+    if (id === "hs22-q10") {
+      if (edit.figureNumber === 4) {
+        edit = clearPrimaryFigureFields(edit);
+        changed = true;
+      }
+      if (edit.secondFigureNumber === 4) {
+        edit = clearSecondFigureFields(edit);
+        changed = true;
+      }
+    }
+
+    if (edit.figureNumber === 4 && edit.sharedFigureQuestionIds?.includes("hs22-q10")) {
+      edit.sharedFigureQuestionIds = edit.sharedFigureQuestionIds.filter((memberId) => memberId !== "hs22-q10");
+      changed = true;
+    }
+    if (edit.secondSharedFigureQuestionIds?.includes("hs22-q10")) {
+      edit.secondSharedFigureQuestionIds = edit.secondSharedFigureQuestionIds.filter((memberId) => memberId !== "hs22-q10");
+      changed = true;
+    }
+
+    return [id, edit];
+  }));
+
+  return changed ? next : current;
 }
 
 export function removeQuestionEditFromCommonSetup(current: EditStore, questionId: string) {
   const next: EditStore = { ...current };
   const group = uniqueIds(current[questionId]?.commonSetupQuestionIds ?? []);
   const figureGroup = uniqueIds(current[questionId]?.sharedFigureQuestionIds ?? []);
+  const secondFigureGroup = uniqueIds(current[questionId]?.secondSharedFigureQuestionIds ?? []);
   delete next[questionId];
 
   const remainingGroup = group.filter((id) => id !== questionId);
@@ -182,6 +323,16 @@ export function removeQuestionEditFromCommonSetup(current: EditStore, questionId
     next[memberId] = {
       ...member,
       sharedFigureQuestionIds: remainingFigureGroup.length > 1 ? remainingFigureGroup : undefined,
+    };
+  }
+
+  const remainingSecondFigureGroup = secondFigureGroup.filter((id) => id !== questionId);
+  for (const memberId of remainingSecondFigureGroup) {
+    const member = next[memberId];
+    if (!member) continue;
+    next[memberId] = {
+      ...member,
+      secondSharedFigureQuestionIds: remainingSecondFigureGroup.length > 1 ? remainingSecondFigureGroup : undefined,
     };
   }
 
