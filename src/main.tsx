@@ -18,6 +18,7 @@ import { ExamPrepApp } from "../app/ExamPrepApp";
 import { installMultiFigureSupport } from "../app/multi-figure";
 import { installWeightedScoringPresentation } from "../app/weighted-scoring";
 import "../app/session-tight.css";
+import "../app/answer-layout-v2.css";
 
 const root = document.getElementById("root");
 
@@ -72,6 +73,14 @@ function measureNaturalAnswerWidth(button: HTMLButtonElement) {
   return width;
 }
 
+function preferredColumnCounts(answerCount: number) {
+  if (answerCount <= 1) return [1];
+  if (answerCount === 2) return [2, 1];
+  if (answerCount === 3) return [3, 2, 1];
+  if (answerCount === 4) return [2, 1];
+  return [3, 2, 1];
+}
+
 function classifyAnswerGrid(grid: HTMLElement) {
   const buttons = Array.from(grid.querySelectorAll<HTMLButtonElement>(":scope > .answer-button"));
   if (!buttons.length) return;
@@ -83,43 +92,51 @@ function classifyAnswerGrid(grid: HTMLElement) {
   const gridWidth = grid.getBoundingClientRect().width;
   if (!gridWidth) return;
 
+  if (window.innerWidth <= 850) {
+    grid.classList.add("answer-layout-stacked");
+    return;
+  }
+
+  /*
+   * Measure the rendered choices instead of using textContent length. KaTeX
+   * contains an accessibility MathML copy, so text-length heuristics count the
+   * same formula twice and used to force perfectly fitting equations into a
+   * one-column layout.
+   */
   const naturalWidths = buttons.map(measureNaturalAnswerWidth);
   const maxNaturalWidth = Math.max(...naturalWidths);
-  const maxTextLength = Math.max(...buttons.map((button) => {
-    const content = button.querySelector<HTMLElement>(":scope > span:last-child");
-    return (content?.textContent ?? "").trim().length;
-  }));
-  const hasDisplayMath = buttons.some((button) => Boolean(button.querySelector(".latex-display, .katex-display")));
-
   const gap = 8;
-  const compactColumns = buttons.length <= 4 ? buttons.length : buttons.length <= 6 ? 3 : 2;
-  const compactColumnWidth = (gridWidth - gap * (compactColumns - 1)) / compactColumns;
-  const balancedColumnWidth = (gridWidth - gap) / 2;
-  const desktop = window.innerWidth > 850;
 
-  const canUseCompact = desktop
-    && !hasDisplayMath
-    && maxTextLength <= 32
-    && maxNaturalWidth <= compactColumnWidth;
-  const canUseBalanced = desktop
-    && !hasDisplayMath
-    && maxTextLength <= 82
-    && maxNaturalWidth <= balancedColumnWidth;
+  let selectedColumns = 1;
+  let selectedScale = 1;
 
-  if (canUseCompact) {
-    grid.classList.add("answer-layout-compact");
-    grid.style.setProperty("--answer-columns", String(compactColumns));
-    return;
+  for (const columns of preferredColumnCounts(buttons.length)) {
+    const columnWidth = (gridWidth - gap * (columns - 1)) / columns;
+    const fitScale = Math.min(1, columnWidth / maxNaturalWidth);
+
+    if (columns === 3 && fitScale >= 0.93) {
+      selectedColumns = 3;
+      selectedScale = fitScale;
+      break;
+    }
+    if (columns === 2 && fitScale >= 0.82) {
+      selectedColumns = 2;
+      selectedScale = fitScale;
+      break;
+    }
+    if (columns === 1) {
+      selectedColumns = 1;
+      selectedScale = Math.max(0.70, Math.min(1, (gridWidth - 4) / maxNaturalWidth));
+      break;
+    }
   }
 
-  if (canUseBalanced) {
-    grid.classList.add("answer-layout-balanced");
-    return;
-  }
+  grid.style.setProperty("--answer-fit-scale", String(selectedScale));
+  grid.style.setProperty("--answer-columns", String(selectedColumns));
 
-  grid.classList.add("answer-layout-stacked");
-  const fitScale = Math.min(1, (gridWidth - 8) / maxNaturalWidth);
-  grid.style.setProperty("--answer-fit-scale", String(Math.max(0.62, fitScale)));
+  if (selectedColumns === 3) grid.classList.add("answer-layout-compact");
+  else if (selectedColumns === 2) grid.classList.add("answer-layout-balanced");
+  else grid.classList.add("answer-layout-stacked");
 }
 
 function adaptAnswerLayouts() {
@@ -143,6 +160,7 @@ const presentationObserver = new MutationObserver((mutations) => {
 });
 presentationObserver.observe(document.body, { childList: true, subtree: true });
 window.addEventListener("resize", schedulePresentationPass);
+void document.fonts?.ready.then(schedulePresentationPass);
 
 /* Multi-select practice submit fix. */
 document.addEventListener("click", (event) => {
