@@ -1,0 +1,110 @@
+/* Final adaptive answer layout overrides. The JS measures rendered KaTeX and
+   assigns 1, 2 or 3 columns; these rules only control density and scale. */
+.answer-grid.answer-layout-compact,
+.answer-grid.answer-layout-balanced,
+.answer-grid.answer-layout-stacked {
+  align-items: stretch;
+  gap: 8px !important;
+}
+
+.answer-grid.answer-layout-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.answer-grid.answer-layout-balanced {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.answer-grid.answer-layout-stacked {
+  grid-template-columns: 1fr !important;
+}
+
+.answer-grid.answer-layout-compact .answer-button,
+.answer-grid.answer-layout-balanced .answer-button,
+.answer-grid.answer-layout-stacked .answer-button {
+  align-items: center !important;
+  height: auto !important;
+  min-width: 0 !important;
+  overflow: clip !important;
+}
+
+.answer-grid.answer-layout-compact .answer-button {
+  min-height: 58px !important;
+  padding: 7px 10px !important;
+}
+
+.answer-grid.answer-layout-balanced .answer-button {
+  min-height: 60px !important;
+  padding: 8px 11px !important;
+}
+
+.answer-grid.answer-layout-stacked .answer-button {
+  min-height: 60px !important;
+  padding: 8px 12px !important;
+}
+
+.answer-grid.answer-layout-compact .answer-button > span:last-child,
+.answer-grid.answer-layout-balanced .answer-button > span:last-child,
+.answer-grid.answer-layout-stacked .answer-button > span:last-child {
+  font-size: calc(21px * var(--answer-fit-scale, 1)) !important;
+  line-height: 1.16 !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  overflow-wrap: anywhere;
+}
+
+.answer-grid.answer-layout-compact .answer-button .katex,
+.answer-grid.answer-layout-balanced .answer-button .katex,
+.answer-grid.answer-layout-stacked .answer-button .katex {
+  font-size: 1.08em !important;
+}
+
+.answer-grid.answer-layout-compact .answer-button .katex-display,
+.answer-grid.answer-layout-balanced .answer-button .katex-display,
+.answer-grid.answer-layout-stacked .answer-button .katex-display {
+  margin: 0 !important;
+  text-align: left !important;
+}
+
+/* The measured layout decides the number of columns. A historical
+   `long-options` class must never force the grid back to one column. */
+.answer-grid.long-options.answer-layout-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.answer-grid.long-options.answer-layout-balanced {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.answer-grid.long-options.answer-layout-stacked {
+  grid-template-columns: 1fr !important;
+}
+
+.answer-grid .answer-button,
+.answer-grid .answer-button * {
+  scrollbar-width: none !important;
+}
+
+.answer-grid .answer-button::-webkit-scrollbar,
+.answer-grid .answer-button *::-webkit-scrollbar {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+
+@media (max-width: 850px) {
+  .answer-grid.answer-layout-compact,
+  .answer-grid.answer-layout-balanced,
+  .answer-grid.answer-layout-stacked,
+  .answer-grid.long-options.answer-layout-compact,
+  .answer-grid.long-options.answer-layout-balanced,
+  .answer-grid.long-options.answer-layout-stacked {
+    grid-template-columns: 1fr !important;
+  }
+
+  .answer-grid.answer-layout-compact .answer-button > span:last-child,
+  .answer-grid.answer-layout-balanced .answer-button > span:last-child,
+  .answer-grid.answer-layout-stacked .answer-button > span:last-child {
+    font-size: 18px !important;
+  }
+}
