@@ -1,3 +1,70 @@
+body:not(.show-accuracy) .header-stat,
+body:not(.show-accuracy) .stat-grid > div:last-child,
+body:not(.show-accuracy) .accuracy-breakdown {
+  display: none !important;
+}
+
+.statistics-settings {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 9px;
+}
+
+.statistics-settings > summary {
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  list-style: none;
+  min-height: 24px;
+}
+
+.statistics-settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.statistics-settings > summary::after {
+  content: " +";
+}
+
+.statistics-settings[open] > summary::after {
+  content: " −";
+}
+
+.statistics-setting {
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-top: 6px;
+  padding: 9px 10px;
+}
+
+.statistics-setting input {
+  accent-color: var(--green);
+  height: 15px;
+  margin: 1px 0 0;
+  width: 15px;
+}
+
+.statistics-setting strong,
+.statistics-setting small {
+  display: block;
+}
+
+.statistics-setting strong {
+  font-size: 10px;
+}
+
+.statistics-setting small {
+  color: var(--ink-soft);
+  font-size: 9px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
 .accuracy-breakdown {
   border-top: 1px solid var(--line);
   margin-top: 12px;
