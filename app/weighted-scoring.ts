@@ -9,27 +9,58 @@ import {
 import { DIFFICULTIES, TOPICS } from "../types/question";
 import "./accuracy-breakdown.css";
 
+const ACCURACY_VISIBILITY_KEY = "iml-show-accuracy-v1";
 let breakdownDimension: ScoreBreakdownDimension = "topic";
+
+function accuracyVisible() {
+  try {
+    return window.localStorage.getItem(ACCURACY_VISIBILITY_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setAccuracyVisible(visible: boolean) {
+  try {
+    window.localStorage.setItem(ACCURACY_VISIBILITY_KEY, visible ? "true" : "false");
+  } catch {
+    // The visibility preference is non-critical; keep the default hidden state.
+  }
+  document.body.classList.toggle("show-accuracy", visible);
+  schedule();
+}
 
 function setText(element: Element | null, value: string) {
   if (element && element.textContent !== value) element.textContent = value;
 }
 
+function findAccuracyCell() {
+  const cells = Array.from(document.querySelectorAll<HTMLElement>(".stat-grid > div"));
+  return cells.find((cell) => {
+    const label = cell.querySelector("span")?.textContent?.trim().toLowerCase();
+    return label === "accuracy" || label === "weighted accuracy";
+  });
+}
+
 function patchProgressAccuracy() {
+  const visible = accuracyVisible();
+  document.body.classList.toggle("show-accuracy", visible);
+
+  const header = document.querySelector<HTMLElement>(".header-stat");
+  if (header) header.hidden = !visible;
+
+  const accuracyCell = findAccuracyCell();
+  if (accuracyCell) accuracyCell.hidden = !visible;
+
+  if (!visible) return;
+
   const score = weightedProgressScore(questions, loadProgress());
   const display = score.possiblePoints ? `${score.percentage}%` : "—";
 
-  const header = document.querySelector<HTMLElement>(".header-stat");
   if (header) {
     setText(header.querySelector("span"), display);
     setText(header.querySelector("small"), "weighted accuracy");
   }
-
-  const cells = Array.from(document.querySelectorAll<HTMLElement>(".stat-grid > div"));
-  const accuracyCell = cells.find((cell) => {
-    const label = cell.querySelector("span")?.textContent?.trim().toLowerCase();
-    return label === "accuracy" || label === "weighted accuracy";
-  });
   if (accuracyCell) {
     setText(accuracyCell.querySelector("strong"), display);
     setText(accuracyCell.querySelector("span"), "weighted accuracy");
@@ -84,6 +115,41 @@ function orderedBreakdown(dimension: ScoreBreakdownDimension) {
   return rows.sort((left, right) => (rank.get(left.key) ?? 999) - (rank.get(right.key) ?? 999));
 }
 
+function ensureStatisticsSettings(panel: HTMLElement) {
+  let settings = panel.querySelector<HTMLDetailsElement>(":scope > .statistics-settings");
+  if (!settings) {
+    settings = document.createElement("details");
+    settings.className = "statistics-settings";
+
+    const summary = document.createElement("summary");
+    summary.textContent = "Settings";
+
+    const label = document.createElement("label");
+    label.className = "statistics-setting";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.setAttribute("aria-label", "Show accuracy statistics");
+    checkbox.addEventListener("change", () => setAccuracyVisible(checkbox.checked));
+
+    const copy = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = "Show accuracy statistics";
+    const hint = document.createElement("small");
+    hint.textContent = "Reveal point-weighted overall and category accuracy.";
+    copy.append(title, hint);
+    label.append(checkbox, copy);
+    settings.append(summary, label);
+
+    const actions = panel.querySelector(":scope > .local-actions");
+    if (actions) panel.insertBefore(settings, actions);
+    else panel.appendChild(settings);
+  }
+
+  const checkbox = settings.querySelector<HTMLInputElement>('input[type="checkbox"]');
+  if (checkbox) checkbox.checked = accuracyVisible();
+  return settings;
+}
+
 function ensureAccuracyBreakdown(panel: HTMLElement) {
   const existing = panel.querySelector<HTMLElement>(":scope > .accuracy-breakdown");
   if (existing) return existing;
@@ -122,8 +188,8 @@ function ensureAccuracyBreakdown(panel: HTMLElement) {
   list.className = "accuracy-breakdown-list";
   details.appendChild(list);
 
-  const localActions = panel.querySelector(":scope > .local-actions");
-  if (localActions) panel.insertBefore(details, localActions);
+  const settings = panel.querySelector(":scope > .statistics-settings");
+  if (settings) panel.insertBefore(details, settings);
   else panel.appendChild(details);
   return details;
 }
@@ -131,6 +197,14 @@ function ensureAccuracyBreakdown(panel: HTMLElement) {
 function patchAccuracyBreakdown() {
   const panel = document.querySelector<HTMLElement>(".stats-panel");
   if (!panel) return;
+
+  ensureStatisticsSettings(panel);
+
+  if (!accuracyVisible()) {
+    panel.querySelector(":scope > .accuracy-breakdown")?.remove();
+    return;
+  }
+
   const details = ensureAccuracyBreakdown(panel);
   const rows = orderedBreakdown(breakdownDimension);
   const signature = JSON.stringify([
@@ -182,6 +256,7 @@ function schedule() {
 }
 
 export function installWeightedScoringPresentation() {
+  document.body.classList.toggle("show-accuracy", accuracyVisible());
   schedule();
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true, characterData: true });
